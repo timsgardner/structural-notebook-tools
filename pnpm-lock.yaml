@@ -1,5 +1,8 @@
+dependencies:
+  marked: 5.0.3
 devDependencies:
   '@types/glob': 8.1.0
+  '@types/marked': 5.0.0
   '@types/mocha': 10.0.1
   '@types/node': 16.18.33
   '@types/vscode': 1.78.1
@@ -183,6 +186,10 @@ packages:
     dev: true
     resolution:
       integrity: sha512-Hr5Jfhc9eYOQNPYO5WLDq/n4jqijdHNlDXjuAQkkt+mWdQR+XJToOHrsD4cPaMXpn6KO7y2+wM8AZEs8VpBLVA==
+  /@types/marked/5.0.0:
+    dev: true
+    resolution:
+      integrity: sha512-YcZe50jhltsCq7rc9MNZC/4QB/OnA2Pd6hrOSTOFajtabN+38slqgDDCeE/0F83SjkKBQcsZUj7VLWR0H5cKRA==
   /@types/minimatch/5.1.2:
     dev: true
     resolution:
@@ -1438,6 +1445,13 @@ packages:
       node: '>=10'
     resolution:
       integrity: sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==
+  /marked/5.0.3:
+    dev: false
+    engines:
+      node: '>= 18'
+    hasBin: true
+    resolution:
+      integrity: sha512-KUONa43Uk74uUNWMxh6lfaNYmSAsRMiDAaX8QBCCRVXzEufR0zX6T33vrGbvTnQLL02ungDM3KSzZtO+chJaHg==
   /merge-stream/2.0.0:
     dev: true
     resolution:
@@ -2231,6 +2245,7 @@ packages:
       integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
 specifiers:
   '@types/glob': ^8.1.0
+  '@types/marked': ^5.0.0
   '@types/mocha': ^10.0.1
   '@types/node': 16.x
   '@types/vscode': ^1.78.0
@@ -2239,6 +2254,7 @@ specifiers:
   '@vscode/test-electron': ^2.3.0
   eslint: ^8.39.0
   glob: ^8.1.0
+  marked: ^5.0.3
   mocha: ^10.2.0
   ts-loader: ^9.4.2
   typescript: ^5.0.4
