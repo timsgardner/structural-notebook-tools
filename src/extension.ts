@@ -170,37 +170,25 @@ function parseCellTreeRoot(root: vscode.NotebookDocument): CellTreeRoot {
   return cellTreeRoot;
 }
 
-function printSitch(fromwhere?: string) {
-  console.log('--------------------------\nSITCH:');
-  if (fromwhere) {
-    console.log('FROM: ' + fromwhere);
-  }
-  console.log('active notebook editor:', vscode.window.activeNotebookEditor);
-  const notebookEditorSelectionsReport = vscode.window.activeNotebookEditor?.selections.map(x => ({end: x.end, start: x.start, isEmpty: x.isEmpty}));
-  console.log('active notebook editor selections:', notebookEditorSelectionsReport);
-  console.log('active text editor:', vscode.window.activeTextEditor);
-  console.log('active text editor selections:', vscode.window.activeTextEditor?.selections.map(x => ({end: x.end, start: x.start, isEmpty: x.isEmpty})));
-  console.log('--END SITCH--')
-}
+// function printSitch(fromwhere?: string) {
+//   console.log('--------------------------\nSITCH:');
+//   if (fromwhere) {
+//     console.log('FROM: ' + fromwhere);
+//   }
+//   console.log('active notebook editor:', vscode.window.activeNotebookEditor);
+//   const notebookEditorSelectionsReport = vscode.window.activeNotebookEditor?.selections.map(x => ({end: x.end, start: x.start, isEmpty: x.isEmpty}));
+//   console.log('active notebook editor selections:', notebookEditorSelectionsReport);
+//   console.log('active text editor:', vscode.window.activeTextEditor);
+//   console.log('active text editor selections:', vscode.window.activeTextEditor?.selections.map(x => ({end: x.end, start: x.start, isEmpty: x.isEmpty})));
+//   console.log('--END SITCH--')
+// }
 
 function stopEditingCell(): void {
-  printSitch('stopEditingCell');
-  // vscode.commands.executeCommand('notebook.cell.quitEdit');
+  vscode.commands.executeCommand('notebook.cell.quitEdit');
 }
 
 function selectSubtree(notebook: vscode.NotebookEditor): void {
-  printSitch('selectSubtree');
   const selection = notebook.selection;
-  if (selection === undefined || selection.isEmpty) {
-    console.log('notebook selection not there.')
-    const te = vscode.window.activeTextEditor;
-    if (te) {
-      const sel2 = te.selections;
-      console.log('active text editor selection starts:', sel2.map(x => x.start));
-    } else {
-      console.log('active text editor not there either');
-    }
-  }
   if (selection !== undefined && !selection.isEmpty) {
     stopEditingCell();
     const cell = notebook.notebook.cellAt(selection.start);
@@ -234,18 +222,16 @@ function selectedCell(
     return notebook.notebook.cellAt(selection.start);
   }
   console.log('in selectedCell. no selected cell');
-  printSitch('selectedCell');
   return null;
 }
 
 function gotoParentCell(notebook: vscode.NotebookEditor) {
-  printSitch('gotoParentCell');
   const ctr = parseCellTreeRoot(notebook.notebook);
   const cell = selectedCell(notebook);
   if (cell) {
     const pcell = findCellTree(cell, ctr)?.parent?.cell;
     if (pcell) {
-      const range = new vscode.NotebookRange(pcell.index, pcell.index);
+      const range = new vscode.NotebookRange(pcell.index, pcell.index + 1);
       //stopEditingCell();
       notebook.selection = range;
       // notebook.selections = [range];
@@ -270,7 +256,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (notebook) {
         selectSubtree(notebook);
       } else {
-        printSitch('subtreeSelect, failed to find notebook');
+        // printSitch('subtreeSelect, failed to find notebook');
       }
     }
   );
@@ -282,7 +268,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (notebook) {
       gotoParentCell(notebook);
     } else {
-      printSitch('gotoParentCell, failed to find notebook');
+      // printSitch('gotoParentCell, failed to find notebook');
     }
   });
   disposables.push(disposable);
