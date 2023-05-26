@@ -13,6 +13,14 @@ type MarkdownLevel = number & { [MarkdownLevelBrand]: void };
 
 type CellLevelsArray = CellLevel[];
 
+type CellTree = {
+  cell: vscode.NotebookCell;
+  children: CellTree[];
+  parent?: CellTree;
+};
+
+type CellTreeRoot = CellTree[];
+
 function findIndexForward<T>(
   arr: T[],
   start: number,
@@ -58,6 +66,110 @@ function getSubarrayFloodFill<T>(
   return arr.slice(left + 1, right);
 }
 
+function setParent(parent: CellTree, child: CellTree): CellTree {
+  child.parent = parent;
+  return child;
+}
+
+function parseCellTree(
+  cells: vscode.NotebookCell[],
+  parentCellInx: number
+): [CellTree, number] {
+  const parentCell = cells[parentCellInx];
+  if (isHeadlineCell(parentCell)) {
+    // the previous level doesn't matter here, so giving it 0
+    // if we care about cells that contain multiple markdown levels, we may have to
+    // do some more tricks here. Or maybe it just works.
+    const parentCmdl = concludingMarkdownLevel(
+      parentCell.document.getText(),
+      0 as any
+    );
+    const children: CellTree[] = [];
+    function wrapup(inx: number): [CellTree, number] {
+      const tree = { cell: parentCell, children };
+      children.forEach((x) => setParent(tree, x));
+      return [tree, i];
+    }
+    let i = parentCellInx + 1;
+    while (i < cells.length) {
+      const maybeChildCell = cells[i];
+      if (isHeadlineCell(maybeChildCell)) {
+        const cmdl = concludingMarkdownLevel(
+          maybeChildCell.document.getText(),
+          0 as any
+        );
+        if (parentCmdl < cmdl) {
+          const [childTree, j] = parseCellTree(cells, i);
+          children.push(childTree);
+          i = j;
+        } else {
+          // we've reached a headline cell "above" the current cell
+          // don't increment i, because it's at the place the next
+          // parse should start
+          return wrapup(i);
+        }
+      } else {
+        const [childTree, j] = parseCellTree(cells, i);
+        children.push(childTree);
+        i = j;
+      }
+    }
+    return wrapup(i);
+  } else {
+    return [{ cell: parentCell, children: [] }, parentCellInx + 1];
+  }
+}
+
+function cellTreeCells(tree: CellTree): vscode.NotebookCell[] {
+  return [tree.cell, ...tree.children.flatMap(cellTreeCells)];
+}
+
+function findCellTree(
+  cell: vscode.NotebookCell,
+  cellTreeRoot: CellTreeRoot
+): CellTree | null {
+  function findCellTreeStep(searchTree: CellTree): CellTree | null {
+    if (searchTree.cell === cell) {
+      return searchTree;
+    }
+    for (let index = 0; index < searchTree.children.length; index++) {
+      const maybeTree = findCellTreeStep(searchTree.children[index]);
+      if (maybeTree !== null) {
+        return maybeTree;
+      }
+    }
+    return null;
+  }
+  for (let i = 0; i < cellTreeRoot.length; i++) {
+    const tree = cellTreeRoot[i];
+    const maybeTree = findCellTreeStep(tree);
+    if (maybeTree !== null) {
+      return maybeTree;
+    }
+  }
+  return null;
+}
+
+function parseCellTreeRoot(root: vscode.NotebookDocument): CellTreeRoot {
+  // Only cells containing headlines may have children.
+  // The children of a cell is all cells after the current cell,
+  // until either the end of the document is reached, or a headline
+  // cell is encountered with concluding depth less than that of the
+  // parent cell. In which case, this cell is not included in the children
+  // of the parent cell.
+
+  const cells = root.getCells();
+  const cellTreeRoot: CellTreeRoot = [];
+  let rootChildrenInx = 0;
+  while (rootChildrenInx < cells.length) {
+    const [tree, j] = parseCellTree(cells, rootChildrenInx);
+    cellTreeRoot.push(tree);
+    rootChildrenInx = j;
+  }
+  console.log(cellTreeRoot);
+  return cellTreeRoot;
+}
+
 /**
  * Returns the level of the final *heading* (subsequent text may be at a lower level??? test this)
  * @param text
@@ -77,19 +189,19 @@ function concludingMarkdownLevel(
   const markedInstance = marked.marked.setOptions({});
 
   // marked.marked.use({ walkTokens });
-	markedInstance.use({walkTokens});
+  markedInstance.use({ walkTokens });
   markedInstance.parse(text);
 
   return headingLevel;
 }
 
 function isHeadlineCell(cell: vscode.NotebookCell): boolean {
-	if (cell.kind !== vscode.NotebookCellKind.Markup) {
-		return false;
-	}
+  if (cell.kind !== vscode.NotebookCellKind.Markup) {
+    return false;
+  }
 
-	const text = cell.document.getText();
-	let isHeadline = false;
+  const text = cell.document.getText();
+  let isHeadline = false;
 
   const walkTokens = (token: marked.marked.Token) => {
     if (token.type === "heading") {
@@ -97,12 +209,12 @@ function isHeadlineCell(cell: vscode.NotebookCell): boolean {
     }
   };
 
-	const markedInstance = marked.marked.setOptions({});
+  const markedInstance = marked.marked.setOptions({});
 
   // marked.marked.use({ walkTokens });
-	markedInstance.use({walkTokens});
+  markedInstance.use({ walkTokens });
   markedInstance.parse(text);
-	return isHeadline;
+  return isHeadline;
 }
 
 function cellLevels(notebook: vscode.NotebookEditor): CellLevelsArray {
@@ -125,20 +237,23 @@ function cellLevels(notebook: vscode.NotebookEditor): CellLevelsArray {
 }
 
 function cellTreeLevels(notebook: vscode.NotebookEditor): number[] {
-	const cells = notebook.notebook.getCells();
+  const cells = notebook.notebook.getCells();
   const cellTreeArray: number[] = [];
   let previousLevel = 0;
   for (let i = 0; i < cells.length; i++) {
     const cell = cells[i];
-		cellTreeArray.push(previousLevel);
+    cellTreeArray.push(previousLevel);
     if (isHeadlineCell(cell)) {
-			const cmdl = concludingMarkdownLevel(cell.document.getText(), previousLevel as any);
-			previousLevel = cmdl;
+      const cmdl = concludingMarkdownLevel(
+        cell.document.getText(),
+        previousLevel as any
+      );
+      previousLevel = cmdl;
     }
   }
-	vscode.window.showInformationMessage(
-		`Computed tree levels: ${cellTreeArray}`
-	);
+  vscode.window.showInformationMessage(
+    `Computed tree levels: ${cellTreeArray}`
+  );
   return cellTreeArray;
 }
 
@@ -170,33 +285,23 @@ function selectCurrentLevel(notebook: vscode.NotebookEditor): void {
   }
 }
 
-function selectSubtree(notebook:  vscode.NotebookEditor): void {
-	const cellSelection = notebook?.selection;
-  if (cellSelection) {
-    const start = cellSelection.start;
-    const cLevels = cellTreeLevels(notebook);
-    const cellLevel = cLevels[start];
-    // this is goofy
-    const cellInxes = Array.from(
-      { length: notebook.notebook.cellCount },
-      (_, i) => i
-    );
-		let treeEnd = -1;
-		for (let i = start + 1; i < cellInxes.length; i++) {
-			if (cLevels[i] > cellLevel) {
-				treeEnd = i;
-			} else {
-				break;
-			}
-		}
-		if (treeEnd !== -1) {
-			notebook.selections = [
-				new vscode.NotebookRange(
-					start,
-					treeEnd + 1
-				),
-			];
-		}
+function selectSubtree(notebook: vscode.NotebookEditor): void {
+  const selection = notebook.selection;
+  if (selection !== undefined && !selection.isEmpty) {
+    const cell = notebook.notebook.cellAt(selection.start);
+    const root = parseCellTreeRoot(notebook.notebook);
+    const tree = findCellTree(cell, root);
+    if (tree) {
+      const treeCells = cellTreeCells(tree);
+      if (treeCells.length > 0) {
+        notebook.selections = [
+          new vscode.NotebookRange(
+            treeCells[0].index,
+            treeCells[treeCells.length - 1].index + 1
+          ),
+        ];
+      }
+    }
   }
 }
 
