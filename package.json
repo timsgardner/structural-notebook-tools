@@ -18,8 +18,8 @@
         "title": "Select cell subtree"
       },
       {
-        "command": "notebook-subtree-select.cellLevel",
-        "title": "get current cell level"
+        "command": "notebook-subtree-select.gotoParentCell",
+        "title": "Go to parent cell"
       }
     ]
   },

@@ -2,16 +2,12 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as marked from "marked";
+import { start } from "repl";
 
-declare const CellIndexBrand: unique symbol;
-declare const CellLevelBrand: unique symbol;
-declare const MarkdownLevelBrand: unique symbol;
+const notebookSubtreeSelectCommandName =
+  "notebook-subtree-select.notebookSubtreeSelect" as const;
 
-type CellIndex = number & { [CellIndexBrand]: void };
-type CellLevel = number & { [CellLevelBrand]: void };
-type MarkdownLevel = number & { [MarkdownLevelBrand]: void };
-
-type CellLevelsArray = CellLevel[];
+const gotoParentCellName = "notebook-subtree-select.gotoParentCell" as const;
 
 type CellTree = {
   cell: vscode.NotebookCell;
@@ -21,52 +17,56 @@ type CellTree = {
 
 type CellTreeRoot = CellTree[];
 
-function findIndexForward<T>(
-  arr: T[],
-  start: number,
-  predicate: (element: T, index: number) => boolean
+function makeMarkedInstance() {
+  return marked.marked.setOptions({mangle: false, headerIds: false});
+}
+
+/**
+ * Returns the level of the final *heading* (subsequent text may be at a lower level??? test this)
+ * @param text
+ */
+function concludingMarkdownLevel(
+  text: string,
+  startingMarkdownLevel: number
 ): number {
-  for (let i = start; i < arr.length; i++) {
-    if (predicate(arr[i], i)) {
-      return i;
+  let headingLevel = startingMarkdownLevel;
+
+  const walkTokens = (token: marked.marked.Token) => {
+    if (token.type === "heading") {
+      headingLevel = token.depth as number;
     }
-  }
-  return -1;
+  };
+
+  const markedInstance = makeMarkedInstance();
+
+  // marked.marked.use({ walkTokens });
+  markedInstance.use({ walkTokens });
+  markedInstance.parse(text);
+
+  return headingLevel;
 }
 
-function findIndexBackward<T>(
-  arr: T[],
-  start: number,
-  predicate: (element: T, index: number) => boolean
-): number {
-  for (let i = start; i >= 0; i--) {
-    if (predicate(arr[i], i)) {
-      return i;
+function isHeadlineCell(cell: vscode.NotebookCell): boolean {
+  if (cell.kind !== vscode.NotebookCellKind.Markup) {
+    return false;
+  }
+
+  const text = cell.document.getText();
+  let isHeadline = false;
+
+  const walkTokens = (token: marked.marked.Token) => {
+    if (token.type === "heading") {
+      isHeadline = true;
     }
-  }
-  return -1;
+  };
+
+  const markedInstance = makeMarkedInstance();
+  markedInstance.use({ walkTokens });
+  markedInstance.parse(text);
+  return isHeadline;
 }
 
-function getSubarrayFloodFill<T>(
-  arr: T[],
-  start: number,
-  predicate: (element: T, index: number) => boolean
-): T[] {
-  let left = start;
-  let right = start;
-
-  while (left >= 0 && predicate(arr[left], left)) {
-    left--;
-  }
-
-  while (right < arr.length && predicate(arr[right], right)) {
-    right++;
-  }
-
-  return arr.slice(left + 1, right);
-}
-
-function setParent(parent: CellTree, child: CellTree): CellTree {
+function setParent(child: CellTree, parent: CellTree): CellTree {
   child.parent = parent;
   return child;
 }
@@ -87,7 +87,7 @@ function parseCellTree(
     const children: CellTree[] = [];
     function wrapup(inx: number): [CellTree, number] {
       const tree = { cell: parentCell, children };
-      children.forEach((x) => setParent(tree, x));
+      children.forEach((x) => setParent(x, tree));
       return [tree, i];
     }
     let i = parentCellInx + 1;
@@ -170,124 +170,39 @@ function parseCellTreeRoot(root: vscode.NotebookDocument): CellTreeRoot {
   return cellTreeRoot;
 }
 
-/**
- * Returns the level of the final *heading* (subsequent text may be at a lower level??? test this)
- * @param text
- */
-function concludingMarkdownLevel(
-  text: string,
-  startingMarkdownLevel: MarkdownLevel
-): MarkdownLevel {
-  let headingLevel = startingMarkdownLevel;
-
-  const walkTokens = (token: marked.marked.Token) => {
-    if (token.type === "heading") {
-      headingLevel = token.depth as MarkdownLevel;
-    }
-  };
-
-  const markedInstance = marked.marked.setOptions({});
-
-  // marked.marked.use({ walkTokens });
-  markedInstance.use({ walkTokens });
-  markedInstance.parse(text);
-
-  return headingLevel;
+function printSitch(fromwhere?: string) {
+  console.log('--------------------------\nSITCH:');
+  if (fromwhere) {
+    console.log('FROM: ' + fromwhere);
+  }
+  console.log('active notebook editor:', vscode.window.activeNotebookEditor);
+  const notebookEditorSelectionsReport = vscode.window.activeNotebookEditor?.selections.map(x => ({end: x.end, start: x.start, isEmpty: x.isEmpty}));
+  console.log('active notebook editor selections:', notebookEditorSelectionsReport);
+  console.log('active text editor:', vscode.window.activeTextEditor);
+  console.log('active text editor selections:', vscode.window.activeTextEditor?.selections.map(x => ({end: x.end, start: x.start, isEmpty: x.isEmpty})));
+  console.log('--END SITCH--')
 }
 
-function isHeadlineCell(cell: vscode.NotebookCell): boolean {
-  if (cell.kind !== vscode.NotebookCellKind.Markup) {
-    return false;
-  }
-
-  const text = cell.document.getText();
-  let isHeadline = false;
-
-  const walkTokens = (token: marked.marked.Token) => {
-    if (token.type === "heading") {
-      isHeadline = true;
-    }
-  };
-
-  const markedInstance = marked.marked.setOptions({});
-
-  // marked.marked.use({ walkTokens });
-  markedInstance.use({ walkTokens });
-  markedInstance.parse(text);
-  return isHeadline;
-}
-
-function cellLevels(notebook: vscode.NotebookEditor): CellLevelsArray {
-  const cells = notebook.notebook.getCells();
-  const cellLevelArray: CellLevelsArray = [];
-  let currentLevel = 0 as CellLevel;
-  for (let i = 0; i < cells.length; i++) {
-    const cell = cells[i];
-    if (cell.kind === vscode.NotebookCellKind.Code) {
-      cellLevelArray.push(currentLevel);
-    } else {
-      currentLevel = concludingMarkdownLevel(
-        cell.document.getText(),
-        currentLevel as unknown as MarkdownLevel
-      ) as unknown as CellLevel;
-      cellLevelArray.push(currentLevel);
-    }
-  }
-  return cellLevelArray;
-}
-
-function cellTreeLevels(notebook: vscode.NotebookEditor): number[] {
-  const cells = notebook.notebook.getCells();
-  const cellTreeArray: number[] = [];
-  let previousLevel = 0;
-  for (let i = 0; i < cells.length; i++) {
-    const cell = cells[i];
-    cellTreeArray.push(previousLevel);
-    if (isHeadlineCell(cell)) {
-      const cmdl = concludingMarkdownLevel(
-        cell.document.getText(),
-        previousLevel as any
-      );
-      previousLevel = cmdl;
-    }
-  }
-  vscode.window.showInformationMessage(
-    `Computed tree levels: ${cellTreeArray}`
-  );
-  return cellTreeArray;
-}
-
-function selectCurrentLevel(notebook: vscode.NotebookEditor): void {
-  const cellSelection = notebook?.selection;
-  if (cellSelection) {
-    const start = cellSelection.start;
-    const cLevels = cellLevels(notebook);
-    const cellLevel = cLevels[start];
-    // this is goofy
-    const cellInxes = Array.from(
-      { length: notebook.notebook.cellCount },
-      (_, i) => i
-    );
-    const levelCellInxes = getSubarrayFloodFill(
-      cellInxes,
-      start,
-      (x) => cLevels[x] >= cellLevel
-    );
-    vscode.window.showInformationMessage(
-      `Attempting to select: ${levelCellInxes}`
-    );
-    notebook.selections = [
-      new vscode.NotebookRange(
-        levelCellInxes[0],
-        levelCellInxes[levelCellInxes.length - 1] + 1
-      ),
-    ];
-  }
+function stopEditingCell(): void {
+  printSitch('stopEditingCell');
+  // vscode.commands.executeCommand('notebook.cell.quitEdit');
 }
 
 function selectSubtree(notebook: vscode.NotebookEditor): void {
+  printSitch('selectSubtree');
   const selection = notebook.selection;
+  if (selection === undefined || selection.isEmpty) {
+    console.log('notebook selection not there.')
+    const te = vscode.window.activeTextEditor;
+    if (te) {
+      const sel2 = te.selections;
+      console.log('active text editor selection starts:', sel2.map(x => x.start));
+    } else {
+      console.log('active text editor not there either');
+    }
+  }
   if (selection !== undefined && !selection.isEmpty) {
+    stopEditingCell();
     const cell = notebook.notebook.cellAt(selection.start);
     const root = parseCellTreeRoot(notebook.notebook);
     const tree = findCellTree(cell, root);
@@ -305,54 +220,69 @@ function selectSubtree(notebook: vscode.NotebookEditor): void {
   }
 }
 
-const notebookSubtreeSelectCommandName =
-  "notebook-subtree-select.notebookSubtreeSelect";
-const cellLevelCommandName = "notebook-subtree-select.cellLevel";
+/**
+ * Returns first selected cell
+ * @param notebook
+ * @returns
+ */
+function selectedCell(
+  notebook: vscode.NotebookEditor
+): vscode.NotebookCell | null {
+  const selection = notebook.selection;
+  if (selection !== undefined && !selection.isEmpty) {
+    console.log('selected cell:', selection.start);
+    return notebook.notebook.cellAt(selection.start);
+  }
+  console.log('in selectedCell. no selected cell');
+  printSitch('selectedCell');
+  return null;
+}
+
+function gotoParentCell(notebook: vscode.NotebookEditor) {
+  printSitch('gotoParentCell');
+  const ctr = parseCellTreeRoot(notebook.notebook);
+  const cell = selectedCell(notebook);
+  if (cell) {
+    const pcell = findCellTree(cell, ctr)?.parent?.cell;
+    if (pcell) {
+      const range = new vscode.NotebookRange(pcell.index, pcell.index);
+      //stopEditingCell();
+      notebook.selection = range;
+      // notebook.selections = [range];
+      // notebook.revealRange(range);
+    }
+  } 
+}
 
 const disposables: vscode.Disposable[] = [];
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-  console.log(
-    'Congratulations, your extension "notebook-subtree-select" is now active!'
-  );
-
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with registerCommand
   // The commandId parameter must match the command field in package.json
   let disposable = vscode.commands.registerCommand(
     notebookSubtreeSelectCommandName,
     () => {
-      // The code you place here will be executed every time your command is executed
-      // Display a message box to the user
       // vscode.window.showInformationMessage('Hello World from Notebook Subtree Select!');
       const notebook = vscode.window.activeNotebookEditor;
       if (notebook) {
         selectSubtree(notebook);
+      } else {
+        printSitch('subtreeSelect, failed to find notebook');
       }
     }
   );
+
   disposables.push(disposable);
 
-  context.subscriptions.push(disposable);
-
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with registerCommand
-  // The commandId parameter must match the command field in package.json
-  disposable = vscode.commands.registerCommand(cellLevelCommandName, () => {
-    // The code you place here will be executed every time your command is executed
-    // Display a message box to the user
-    // vscode.window.showInformationMessage('Hello World from Notebook Subtree Select!');
+  disposable = vscode.commands.registerCommand(gotoParentCellName, () => {
     const notebook = vscode.window.activeNotebookEditor;
-    const cellSelection = notebook?.selection;
-    if (cellSelection) {
-      const start = cellSelection.start;
-      const levels = cellLevels(notebook);
-      const level = levels[start];
-      vscode.window.showInformationMessage(`Cell level: ${level}`);
+    if (notebook) {
+      gotoParentCell(notebook);
+    } else {
+      printSitch('gotoParentCell, failed to find notebook');
     }
   });
   disposables.push(disposable);
