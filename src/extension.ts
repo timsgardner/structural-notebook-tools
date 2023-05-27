@@ -88,6 +88,13 @@ function isHeadlineCell(cell: vscode.NotebookCell): boolean {
   return isHeadline;
 }
 
+/**
+ * Recursively add `parent` connections to a PreconnectedCellTreeBranch, thus converting it to a proper CellTreeBranch.
+ * 
+ * @param root 
+ * @param tree 
+ * @returns 
+ */
 function connectCellTree(
   root: CellTree,
   tree: PreconnectedCellTreeBranch
