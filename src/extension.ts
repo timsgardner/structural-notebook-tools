@@ -1,36 +1,47 @@
 // The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-
-
-// TODO: "root" should be part of the tree, having it a different thing
-// makes dealing with the hierarchy in a uniform way very difficult.
-// And it isn't hard. Fix this before writing more functions.
-
-
 import * as vscode from "vscode";
 import * as marked from "marked";
-import { start } from "repl";
 
 const notebookSubtreeSelectCommandName =
   "notebook-subtree-select.notebookSubtreeSelect" as const;
 
 const gotoParentCellName = "notebook-subtree-select.gotoParentCell" as const;
 
-type CellTree = {
-  cell: vscode.NotebookCell;
-  children: CellTree[];
-  parent?: CellTree;
+type CellTreeBase = {
+  children: CellTreeBranch[];
 };
 
-type CellTreeRoot = CellTree[];
+type CellTreeRoot = CellTreeBase & {
+  root: true;
+};
+
+type CellTreeBranch = CellTreeBase & {
+  root: false;
+  cell: vscode.NotebookCell;
+  parent: CellTree;
+};
+
+type PreconnectedCellTreeBranch = Omit<
+  CellTreeBranch,
+  "parent" | "children"
+> & { children: PreconnectedCellTreeBranch[] };
+
+type CellTree = CellTreeRoot | CellTreeBranch;
+
+/********************************
+ * Parse notebook tree
+ *******************************/
 
 function makeMarkedInstance() {
   return marked.marked.setOptions({ mangle: false, headerIds: false });
 }
 
 /**
- * Returns the level of the final *heading* (subsequent text may be at a lower level??? test this)
- * @param text
+ * Determines the concluding Markdown level of a given text starting from a specified Markdown level.
+ *
+ * @param text - The text to analyze.
+ * @param startingMarkdownLevel - The starting Markdown level.
+ * @returns The concluding Markdown level.
  */
 function concludingMarkdownLevel(
   text: string,
@@ -51,6 +62,12 @@ function concludingMarkdownLevel(
   return headingLevel;
 }
 
+/**
+ * Checks if the given notebook cell is a headline cell.
+ *
+ * @param cell - The notebook cell to check.
+ * @returns A boolean indicating whether the cell is a headline cell.
+ */
 function isHeadlineCell(cell: vscode.NotebookCell): boolean {
   if (cell.kind !== vscode.NotebookCellKind.Markup) {
     return false;
@@ -71,16 +88,35 @@ function isHeadlineCell(cell: vscode.NotebookCell): boolean {
   return isHeadline;
 }
 
-function setParent(child: CellTree, parent: CellTree): CellTree {
-  child.parent = parent;
-  return child;
+function connectCellTree(
+  root: CellTree,
+  tree: PreconnectedCellTreeBranch
+): CellTreeBranch {
+  // For giggles, trying to do this in a "typesafe" way via legerdemain. Sort of a
+  // dumb pseudo-functional trick, can remove later on the vanishingly remote chance
+  // anyone has a notebook massive enough for the slight flutter of short-lived
+  // allocation to make a snowball's difference in hell
+  const rChildren = root.children;
+  const x: CellTreeBranch = Object.assign(tree, { parent: root, children: [] });
+  const y: CellTreeBranch = Object.assign(x, {
+    children: rChildren.map((child) => connectCellTree(x, child)),
+  });
+  return y;
 }
 
-function parseCellTree(
+/**
+ * Returns the tree without the parent connections.
+ * We add those in the next step in `parseCellTree`.
+ * Makes the recursion a little less annoying.
+ * @param cells
+ * @param cellInx
+ * @returns
+ */
+function preconnectedCellTree(
   cells: vscode.NotebookCell[],
-  parentCellInx: number
-): [CellTree, number] {
-  const parentCell = cells[parentCellInx];
+  cellInx: number
+): [PreconnectedCellTreeBranch, number] {
+  const parentCell = cells[cellInx];
   if (isHeadlineCell(parentCell)) {
     // the previous level doesn't matter here, so giving it 0
     // if we care about cells that contain multiple markdown levels, we may have to
@@ -89,13 +125,16 @@ function parseCellTree(
       parentCell.document.getText(),
       0 as any
     );
-    const children: CellTree[] = [];
-    function wrapup(inx: number): [CellTree, number] {
-      const tree = { cell: parentCell, children };
-      children.forEach((x) => setParent(x, tree));
-      return [tree, i];
+    const children: PreconnectedCellTreeBranch[] = [];
+    function wrapup(inx: number): [PreconnectedCellTreeBranch, number] {
+      const tree: PreconnectedCellTreeBranch = {
+        cell: parentCell,
+        children,
+        root: false,
+      };
+      return [tree, inx];
     }
-    let i = parentCellInx + 1;
+    let i = cellInx + 1;
     while (i < cells.length) {
       const maybeChildCell = cells[i];
       if (isHeadlineCell(maybeChildCell)) {
@@ -104,75 +143,217 @@ function parseCellTree(
           0 as any
         );
         if (parentCmdl < cmdl) {
-          const [childTree, j] = parseCellTree(cells, i);
+          const [childTree, j] = preconnectedCellTree(cells, i);
           children.push(childTree);
           i = j;
         } else {
-          // we've reached a headline cell "above" the current cell
+          // We've reached a headline cell "above" the current cell;
           // don't increment i, because it's at the place the next
           // parse should start
           return wrapup(i);
         }
       } else {
-        const [childTree, j] = parseCellTree(cells, i);
+        const [childTree, j] = preconnectedCellTree(cells, i);
         children.push(childTree);
         i = j;
       }
     }
     return wrapup(i);
   } else {
-    return [{ cell: parentCell, children: [] }, parentCellInx + 1];
+    return [{ cell: parentCell, root: false, children: [] }, cellInx + 1];
   }
 }
 
-function cellTreeCells(tree: CellTree): vscode.NotebookCell[] {
-  return [tree.cell, ...tree.children.flatMap(cellTreeCells)];
-}
-
-function findCellTree(
-  cell: vscode.NotebookCell,
-  cellTreeRoot: CellTreeRoot
-): CellTree | null {
-  function findCellTreeStep(searchTree: CellTree): CellTree | null {
-    if (searchTree.cell === cell) {
-      return searchTree;
-    }
-    for (let index = 0; index < searchTree.children.length; index++) {
-      const maybeTree = findCellTreeStep(searchTree.children[index]);
-      if (maybeTree !== null) {
-        return maybeTree;
-      }
-    }
-    return null;
-  }
-  for (let i = 0; i < cellTreeRoot.length; i++) {
-    const tree = cellTreeRoot[i];
-    const maybeTree = findCellTreeStep(tree);
-    if (maybeTree !== null) {
-      return maybeTree;
-    }
-  }
-  return null;
-}
-
-function parseCellTreeRoot(root: vscode.NotebookDocument): CellTreeRoot {
+function parseCellTree(notebook: vscode.NotebookEditor): CellTreeRoot {
   // Only cells containing headlines may have children.
   // The children of a cell is all cells after the current cell,
   // until either the end of the document is reached, or a headline
   // cell is encountered with concluding depth less than that of the
   // parent cell. In which case, this cell is not included in the children
   // of the parent cell.
-
-  const cells = root.getCells();
-  const cellTreeRoot: CellTreeRoot = [];
-  let rootChildrenInx = 0;
-  while (rootChildrenInx < cells.length) {
-    const [tree, j] = parseCellTree(cells, rootChildrenInx);
-    cellTreeRoot.push(tree);
-    rootChildrenInx = j;
+  const cells = Array.from({ length: notebook.notebook.cellCount }, (_, i) =>
+    notebook.notebook.cellAt(i)
+  );
+  const preconnectedCells: PreconnectedCellTreeBranch[] = [];
+  let i = 0;
+  while (i < cells.length) {
+    const [pctb, j] = preconnectedCellTree(cells, i);
+    preconnectedCells.push(pctb);
+    i = j;
   }
-  console.log(cellTreeRoot);
-  return cellTreeRoot;
+  // more legerdemain
+  const root: CellTreeRoot = { root: true, children: [] };
+  const childrenCells = preconnectedCells.map((pctb) =>
+    connectCellTree(root, pctb)
+  );
+  root.children = childrenCells;
+  return root;
+}
+
+/********************************
+ * CellTree helpers
+ *******************************/
+
+function getCell(cellTree: CellTree): vscode.NotebookCell | null {
+  if (cellTree.root) {
+    return null;
+  }
+  return cellTree.cell;
+}
+
+function cellTreeCells(tree: CellTree): vscode.NotebookCell[] {
+  const cells = tree.children.flatMap(cellTreeCells);
+  if (tree.root) {
+    return cells;
+  }
+  cells.unshift(tree.cell);
+  return cells;
+}
+
+function findCellTree(
+  cell: vscode.NotebookCell,
+  cellTree: CellTree
+): CellTreeBranch | null {
+  // pre-order depth-first search
+  if (!cellTree.root && cellTree.cell === cell) {
+    return cellTree;
+  }
+  for (const ct of cellTree.children) {
+    const v = findCellTree(cell, ct);
+    if (v !== null) {
+      return v;
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns the provided notebook editor if available, or the active notebook editor.
+ *
+ * @param providedNotebook - Optional: The provided notebook editor. Nullable.
+ * @returns The provided notebook editor, if available; otherwise, the active notebook editor. Returns null if neither is available.
+ */
+function providedOrActiveNotebook(
+  providedNotebook?: vscode.NotebookEditor | null
+): vscode.NotebookEditor | null {
+  // Get the notebook editor to use
+  let notebook2: vscode.NotebookEditor;
+
+  if (providedNotebook == null) {
+    // If no provided notebook editor, use the active notebook editor
+    const nb = vscode.window.activeNotebookEditor;
+    if (nb == null) {
+      return null;
+    }
+    notebook2 = nb;
+  } else {
+    // Use the provided notebook editor
+    notebook2 = providedNotebook;
+  }
+
+  return notebook2;
+}
+
+/**
+ * Returns the CellTree object representing the hierarchical structure of notebook cells.
+ * If a specific cell and notebook editor are provided, it finds the CellTree for that cell.
+ * If no cell or notebook editor is provided, it uses the active notebook editor and the currently selected cell.
+ *
+ * Note that the entire hierarchy can be accessed from this CellTree object via the `parent` attribute.
+ *
+ * @param cell - Optional: The notebook cell to find the CellTree for.
+ * @param notebook - Optional: The notebook editor containing the cell.
+ * @returns The CellTree object representing the hierarchy starting at `cell`, or null if not found.
+ */
+function cellTree(
+  cell?: vscode.NotebookCell | null,
+  notebook?: vscode.NotebookEditor
+): CellTreeBranch | null {
+  // Get the notebook editor to use
+  const notebook2 = providedOrActiveNotebook(notebook);
+  if (notebook2 == null) {
+    return null;
+  }
+
+  // Get the cell to find the CellTree for
+  let cell2: vscode.NotebookCell;
+  if (cell == null) {
+    const selection = notebook2.selection;
+    if (selection == null || selection.isEmpty) {
+      return null;
+    }
+    cell2 = notebook2.notebook.cellAt(selection.start);
+  } else {
+    cell2 = cell;
+  }
+
+  // Parse the CellTree for the notebook
+  const root = parseCellTree(notebook2);
+
+  // Find the CellTree for the given cell
+  return findCellTree(cell2, root);
+}
+
+/********************************
+ * Misc
+ *******************************/
+
+/**
+ * Resolves the input parameter to obtain the corresponding NotebookCell.
+ *
+ * @param cellOrIndex - The NotebookCell or its index to be resolved.
+ * @param notebook - Optional: The notebook editor containing the cells.
+ * @returns The resolved NotebookCell, or null if not found.
+ */
+function resolveNotebookCell(
+  cellOrIndex: vscode.NotebookCell | number,
+  notebook?: vscode.NotebookEditor | null
+): vscode.NotebookCell | null {
+  // If the input parameter is already a NotebookCell, return it
+  if (typeof cellOrIndex !== "number") {
+    return cellOrIndex;
+  }
+
+  // If the input parameter is an index, find the corresponding NotebookCell
+  const notebook2 = providedOrActiveNotebook(notebook);
+  if (notebook2 == null) {
+    return null;
+  }
+
+  const index = cellOrIndex as number;
+  if (index < 0 || index >= notebook2.notebook.cellCount) {
+    return null;
+  }
+
+  return notebook2.notebook.cellAt(index);
+}
+
+/**
+ * Sets the selection range in the provided notebook editor, including both the start and end cells.
+ *
+ * @param startCell - The start cell or its index of the selection range.
+ * @param endCell - The end cell or its index of the selection range.
+ * @param notebook - (Optional) The notebook editor in which to set the selection range. If not provided or null, the active notebook editor will be used.
+ * @throws Error if the notebook editor or the cells cannot be found.
+ */
+function setSelectionInclusiveCellRange(
+  startCell: vscode.NotebookCell | number,
+  endCell: vscode.NotebookCell | number,
+  notebook?: vscode.NotebookEditor | null
+): void {
+  const notebook2 = providedOrActiveNotebook(notebook);
+  if (notebook2 == null) {
+    throw new Error("Cannot find notebook editor.");
+  }
+  const startCell2 = resolveNotebookCell(startCell, notebook2);
+  const endCell2 = resolveNotebookCell(endCell, notebook2);
+  if (startCell2 == null || endCell2 == null) {
+    throw new Error("Cannot find cells.");
+  }
+  notebook2.selection = new vscode.NotebookRange(
+    startCell2.index,
+    endCell2.index + 1
+  );
 }
 
 function stopEditingCell(): void {
@@ -180,84 +361,88 @@ function stopEditingCell(): void {
 }
 
 /**
- * Returns first selected cell
- * @param notebook
- * @returns
+ * Returns the first selected cell in the provided notebook editor or the active notebook editor.
+ *
+ * @param notebook - Optional: The notebook editor to retrieve the selected cell from.
+ * @returns The first selected cell, or null if no cell is selected or no notebook editor is available.
  */
 function selectedCell(
-  notebook: vscode.NotebookEditor
+  notebook?: vscode.NotebookEditor | null
 ): vscode.NotebookCell | null {
-  const selection = notebook.selection;
-  if (selection !== undefined && !selection.isEmpty) {
-    console.log("selected cell:", selection.start);
-    return notebook.notebook.cellAt(selection.start);
+  // Get the notebook editor to use
+  const notebook2 = providedOrActiveNotebook(notebook);
+  if (notebook2 == null) {
+    return null;
   }
-  console.log("in selectedCell. no selected cell");
+
+  // Retrieve the first selected cell, if available
+  const selection = notebook2.selection;
+  if (selection !== undefined && !selection.isEmpty) {
+    return notebook2.notebook.cellAt(selection.start);
+  }
+
+  // No cell is selected
   return null;
 }
 
 /********************************
- * selectors
+ * Selectors
  *******************************/
 
-function selectSubtree(notebook: vscode.NotebookEditor): void {
-  const selection = notebook.selection;
-  if (selection !== undefined && !selection.isEmpty) {
-    stopEditingCell();
-    const cell = notebook.notebook.cellAt(selection.start);
-    const root = parseCellTreeRoot(notebook.notebook);
-    const tree = findCellTree(cell, root);
-    if (tree) {
-      const treeCells = cellTreeCells(tree);
-      if (treeCells.length > 0) {
-        notebook.selections = [
-          new vscode.NotebookRange(
-            treeCells[0].index,
-            treeCells[treeCells.length - 1].index + 1
-          ),
-        ];
-      }
-    }
+function selectSubtree(): void {
+  const tree = cellTree(selectedCell());
+  if (tree === null) {
+    return;
+  }
+  if (tree.children.length > 0) {
+    setSelectionInclusiveCellRange(
+      tree.children[0].cell,
+      tree.children[tree.children.length - 1].cell
+    );
   }
 }
 
 function selectSiblings(notebook: vscode.NotebookEditor): void {
-  const selection = notebook.selection;
-  if (selection !== undefined && !selection.isEmpty) {
-    stopEditingCell();
-    const cell = notebook.notebook.cellAt(selection.start);
-    const root = parseCellTreeRoot(notebook.notebook);
-    const tree = findCellTree(cell, root);
-    const ptree = tree?.parent;
-    if (ptree) {
-      const cells = ptree.children.flatMap(cellTreeCells);
-      notebook.selections = [
-        new vscode.NotebookRange(
-          cells[0].index,
-          cells[cells.length - 1].index + 1
-        )
-      ];
-    }
+  const tree = cellTree(selectedCell());
+  if (tree === null) {
+    return;
   }
+  const p = tree.parent;
+  setSelectionInclusiveCellRange(
+    p.children[0].cell,
+    tree.children[tree.children.length - 1].cell
+  );
 }
 
 /********************************
  * gotos
  *******************************/
 
-function gotoParentCell(notebook: vscode.NotebookEditor) {
-  const ctr = parseCellTreeRoot(notebook.notebook);
-  const cell = selectedCell(notebook);
-  if (cell) {
-    const pcell = findCellTree(cell, ctr)?.parent?.cell;
-    if (pcell) {
-      const range = new vscode.NotebookRange(pcell.index, pcell.index + 1);
-      //stopEditingCell();
-      notebook.selection = range;
-      notebook.revealRange(range);
-    }
+function gotoCell(cell: vscode.NotebookCell): void {
+  const notebook = providedOrActiveNotebook();
+  if (notebook === null) {
+    return;
   }
+  const range = new vscode.NotebookRange(cell.index, cell.index + 1);
+  notebook.selection = range;
+  notebook.revealRange(range);
 }
+
+function gotoParentCell(): void {
+  const tree = cellTree(selectedCell());
+  if (tree === null) {
+    return;
+  }
+  const p = tree.parent;
+  if (p.root) {
+    return;
+  }
+  setSelectionInclusiveCellRange(p.cell, p.cell);
+}
+
+/********************************
+ * Activation
+ *******************************/
 
 const disposables: vscode.Disposable[] = [];
 
@@ -270,20 +455,14 @@ export function activate(context: vscode.ExtensionContext) {
   let disposable = vscode.commands.registerCommand(
     notebookSubtreeSelectCommandName,
     () => {
-      const notebook = vscode.window.activeNotebookEditor;
-      if (notebook) {
-        selectSubtree(notebook);
-      }
+      selectSubtree();
     }
   );
 
   disposables.push(disposable);
 
   disposable = vscode.commands.registerCommand(gotoParentCellName, () => {
-    const notebook = vscode.window.activeNotebookEditor;
-    if (notebook) {
-      gotoParentCell(notebook);
-    }
+    gotoParentCell();
   });
   disposables.push(disposable);
 
