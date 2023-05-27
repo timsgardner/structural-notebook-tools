@@ -1,5 +1,12 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
+
+
+// TODO: "root" should be part of the tree, having it a different thing
+// makes dealing with the hierarchy in a uniform way very difficult.
+// And it isn't hard. Fix this before writing more functions.
+
+
 import * as vscode from "vscode";
 import * as marked from "marked";
 import { start } from "repl";
@@ -18,7 +25,7 @@ type CellTree = {
 type CellTreeRoot = CellTree[];
 
 function makeMarkedInstance() {
-  return marked.marked.setOptions({mangle: false, headerIds: false});
+  return marked.marked.setOptions({ mangle: false, headerIds: false });
 }
 
 /**
@@ -38,8 +45,6 @@ function concludingMarkdownLevel(
   };
 
   const markedInstance = makeMarkedInstance();
-
-  // marked.marked.use({ walkTokens });
   markedInstance.use({ walkTokens });
   markedInstance.parse(text);
 
@@ -170,22 +175,30 @@ function parseCellTreeRoot(root: vscode.NotebookDocument): CellTreeRoot {
   return cellTreeRoot;
 }
 
-// function printSitch(fromwhere?: string) {
-//   console.log('--------------------------\nSITCH:');
-//   if (fromwhere) {
-//     console.log('FROM: ' + fromwhere);
-//   }
-//   console.log('active notebook editor:', vscode.window.activeNotebookEditor);
-//   const notebookEditorSelectionsReport = vscode.window.activeNotebookEditor?.selections.map(x => ({end: x.end, start: x.start, isEmpty: x.isEmpty}));
-//   console.log('active notebook editor selections:', notebookEditorSelectionsReport);
-//   console.log('active text editor:', vscode.window.activeTextEditor);
-//   console.log('active text editor selections:', vscode.window.activeTextEditor?.selections.map(x => ({end: x.end, start: x.start, isEmpty: x.isEmpty})));
-//   console.log('--END SITCH--')
-// }
-
 function stopEditingCell(): void {
-  vscode.commands.executeCommand('notebook.cell.quitEdit');
+  vscode.commands.executeCommand("notebook.cell.quitEdit");
 }
+
+/**
+ * Returns first selected cell
+ * @param notebook
+ * @returns
+ */
+function selectedCell(
+  notebook: vscode.NotebookEditor
+): vscode.NotebookCell | null {
+  const selection = notebook.selection;
+  if (selection !== undefined && !selection.isEmpty) {
+    console.log("selected cell:", selection.start);
+    return notebook.notebook.cellAt(selection.start);
+  }
+  console.log("in selectedCell. no selected cell");
+  return null;
+}
+
+/********************************
+ * selectors
+ *******************************/
 
 function selectSubtree(notebook: vscode.NotebookEditor): void {
   const selection = notebook.selection;
@@ -208,22 +221,29 @@ function selectSubtree(notebook: vscode.NotebookEditor): void {
   }
 }
 
-/**
- * Returns first selected cell
- * @param notebook
- * @returns
- */
-function selectedCell(
-  notebook: vscode.NotebookEditor
-): vscode.NotebookCell | null {
+function selectSiblings(notebook: vscode.NotebookEditor): void {
   const selection = notebook.selection;
   if (selection !== undefined && !selection.isEmpty) {
-    console.log('selected cell:', selection.start);
-    return notebook.notebook.cellAt(selection.start);
+    stopEditingCell();
+    const cell = notebook.notebook.cellAt(selection.start);
+    const root = parseCellTreeRoot(notebook.notebook);
+    const tree = findCellTree(cell, root);
+    const ptree = tree?.parent;
+    if (ptree) {
+      const cells = ptree.children.flatMap(cellTreeCells);
+      notebook.selections = [
+        new vscode.NotebookRange(
+          cells[0].index,
+          cells[cells.length - 1].index + 1
+        )
+      ];
+    }
   }
-  console.log('in selectedCell. no selected cell');
-  return null;
 }
+
+/********************************
+ * gotos
+ *******************************/
 
 function gotoParentCell(notebook: vscode.NotebookEditor) {
   const ctr = parseCellTreeRoot(notebook.notebook);
@@ -236,7 +256,7 @@ function gotoParentCell(notebook: vscode.NotebookEditor) {
       notebook.selection = range;
       notebook.revealRange(range);
     }
-  } 
+  }
 }
 
 const disposables: vscode.Disposable[] = [];
@@ -250,12 +270,9 @@ export function activate(context: vscode.ExtensionContext) {
   let disposable = vscode.commands.registerCommand(
     notebookSubtreeSelectCommandName,
     () => {
-      // vscode.window.showInformationMessage('Hello World from Notebook Subtree Select!');
       const notebook = vscode.window.activeNotebookEditor;
       if (notebook) {
         selectSubtree(notebook);
-      } else {
-        // printSitch('subtreeSelect, failed to find notebook');
       }
     }
   );
@@ -266,8 +283,6 @@ export function activate(context: vscode.ExtensionContext) {
     const notebook = vscode.window.activeNotebookEditor;
     if (notebook) {
       gotoParentCell(notebook);
-    } else {
-      // printSitch('gotoParentCell, failed to find notebook');
     }
   });
   disposables.push(disposable);
