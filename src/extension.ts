@@ -363,6 +363,11 @@ function setSelectionInclusiveCellRange(
   );
 }
 
+function selectCellTree(cellTree: CellTree): void {
+  const cells = cellTreeCells(cellTree);
+  setSelectionInclusiveCellRange(cells[0].index, cells[cells.length - 1].index);
+}
+
 function stopEditingCell(): void {
   vscode.commands.executeCommand("notebook.cell.quitEdit");
 }
@@ -401,10 +406,11 @@ function selectSubtree(): void {
   if (tree === null) {
     return;
   }
+  const cells = tree.children.flatMap(cellTreeCells);
   if (tree.children.length > 0) {
     setSelectionInclusiveCellRange(
-      tree.children[0].cell,
-      tree.children[tree.children.length - 1].cell
+      cells[0],
+      cells[cells.length - 1]
     );
   }
 }
