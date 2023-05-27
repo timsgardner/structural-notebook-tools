@@ -234,8 +234,7 @@ function gotoParentCell(notebook: vscode.NotebookEditor) {
       const range = new vscode.NotebookRange(pcell.index, pcell.index + 1);
       //stopEditingCell();
       notebook.selection = range;
-      // notebook.selections = [range];
-      // notebook.revealRange(range);
+      notebook.revealRange(range);
     }
   } 
 }
