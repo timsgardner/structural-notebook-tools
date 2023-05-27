@@ -406,13 +406,7 @@ function selectSubtree(): void {
   if (tree === null) {
     return;
   }
-  const cells = tree.children.flatMap(cellTreeCells);
-  if (tree.children.length > 0) {
-    setSelectionInclusiveCellRange(
-      cells[0],
-      cells[cells.length - 1]
-    );
-  }
+  selectCellTree(tree);
 }
 
 function selectSiblings(notebook: vscode.NotebookEditor): void {
