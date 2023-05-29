@@ -15,11 +15,43 @@
     "commands": [
       {
         "command": "notebook-subtree-select.notebookSubtreeSelect",
-        "title": "Select cell subtree"
+        "title": "Select cell subtree",
+        "description": "Selects the subtree of cells starting from the current cell"
       },
       {
         "command": "notebook-subtree-select.gotoParentCell",
-        "title": "Go to parent cell"
+        "title": "Go to next cell parent",
+        "description": "Navigates to the parent cell of the current cell"
+      },
+      {
+        "command": "notebook-subtree-select.gotoForwardAndUp",
+        "title": "Go to next cell forward and up",
+        "description": "Moves to the next sibling cell if present, or to parent cell"
+      },
+      {
+        "command": "notebook-subtree-select.gotoBackwardAndUp",
+        "title": "Go to next cell backward and up",
+        "description": "Moves to the previous sibling cell if present, or to parent cell"
+      },
+      {
+        "command": "notebook-subtree-select.gotoForwardAndOver",
+        "title": "Go to next cell forward and over",
+        "description": "Moves to the next sibling cell if present, or to parent cell's next sibling"
+      },
+      {
+        "command": "notebook-subtree-select.gotoNextBreadthFirst",
+        "title": "Go to next breadth-first cell",
+        "description": "Navigates to the next cell using a breadth-first traversal"
+      },
+      {
+        "command": "notebook-subtree-select.gotoNextDepthFirst",
+        "title": "Go to next depth-first cell",
+        "description": "Navigates to the next cell using a depth-first traversal"
+      },
+      {
+        "command": "notebook-subtree-select.insertHeadingBelow",
+        "title": "Insert notebook heading below",
+        "description": "Inserts a heading cell below the current cell in the notebook"
       }
     ]
   },

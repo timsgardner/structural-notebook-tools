@@ -1,13 +1,29 @@
 // The module 'vscode' contains the VS Code extensibility API
 import * as vscode from "vscode";
 import * as marked from "marked";
+import { getTraversalFunctions } from "./traversals";
+import { mapGenerator, filterGenerator, isNonNullable, enforcePresence } from "./utils";
 
 const notebookSubtreeSelectCommandName =
   "notebook-subtree-select.notebookSubtreeSelect" as const;
-
 const gotoParentCellName = "notebook-subtree-select.gotoParentCell" as const;
+const gotoForwardAndUpCommandName =
+  "notebook-subtree-select.gotoForwardAndUp" as const;
+const gotoBackwardAndUpCommandName =
+  "notebook-subtree-select.gotoBackwardAndUp" as const;
+const gotoForwardAndOverCommandName =
+  "notebook-subtree-select.gotoForwardAndOver" as const;
+const gotoNextBreadthFirstCommandName =
+  "notebook-subtree-select.gotoNextBreadthFirst" as const;
+const gotoNextDepthFirstCommandName =
+  "notebook-subtree-select.gotoNextDepthFirst" as const;
+const insertHeadingBelowCommandName =
+  "notebook-subtree-select.insertHeadingBelow" as const;
+
+const cellTreeBrand = Symbol("IsCellTree");
 
 type CellTreeBase = {
+  [cellTreeBrand]: true;
   children: CellTreeBranch[];
 };
 
@@ -27,6 +43,25 @@ type PreconnectedCellTreeBranch = Omit<
 > & { children: PreconnectedCellTreeBranch[] };
 
 type CellTree = CellTreeRoot | CellTreeBranch;
+
+function isCellTree(x: any): x is CellTree {
+  return x && x[cellTreeBrand] === true;
+}
+
+/********************************
+ * traversals
+ *******************************/
+
+const {
+  backwardAndUpTraversal,
+  breadthFirstTraversal,
+  depthFirstTraversal,
+  forwardAndOverTraversal,
+  forwardAndUpTraversal,
+} = getTraversalFunctions(
+  (t: CellTree) => (t.root ? null : t.parent),
+  (t: CellTree) => t.children
+);
 
 /********************************
  * Parse notebook tree
@@ -90,10 +125,10 @@ function isHeadlineCell(cell: vscode.NotebookCell): boolean {
 
 /**
  * Recursively add `parent` connections to a PreconnectedCellTreeBranch, thus converting it to a proper CellTreeBranch.
- * 
- * @param root 
- * @param tree 
- * @returns 
+ *
+ * @param root
+ * @param tree
+ * @returns
  */
 function connectCellTree(
   root: CellTree,
@@ -103,10 +138,10 @@ function connectCellTree(
   // dumb pseudo-functional trick, can remove later on the vanishingly remote chance
   // anyone has a notebook massive enough for the slight flutter of short-lived
   // allocation to make a snowball's difference in hell
-  const rChildren = root.children;
+  const tChildren = tree.children;
   const x: CellTreeBranch = Object.assign(tree, { parent: root, children: [] });
   const y: CellTreeBranch = Object.assign(x, {
-    children: rChildren.map((child) => connectCellTree(x, child)),
+    children: tChildren.map((child) => connectCellTree(x, child)),
   });
   return y;
 }
@@ -115,9 +150,11 @@ function connectCellTree(
  * Returns the tree without the parent connections.
  * We add those in the next step in `parseCellTree`.
  * Makes the recursion a little less annoying.
- * @param cells
- * @param cellInx
- * @returns
+ * 
+ * @param cells - Array of NotebookCells to parse as a tree.
+ * @param cellInx - Index of the current cell.
+ * 
+ * @returns Array containing the preconnected cell tree branch and the next index.
  */
 function preconnectedCellTree(
   cells: vscode.NotebookCell[],
@@ -125,38 +162,33 @@ function preconnectedCellTree(
 ): [PreconnectedCellTreeBranch, number] {
   const parentCell = cells[cellInx];
   if (isHeadlineCell(parentCell)) {
-    // the previous level doesn't matter here, so giving it 0
-    // if we care about cells that contain multiple markdown levels, we may have to
-    // do some more tricks here. Or maybe it just works.
-    const parentCmdl = concludingMarkdownLevel(
-      parentCell.document.getText(),
-      0 as any
-    );
+    const parentCmdl = concludingMarkdownLevel(parentCell.document.getText(), 0);
     const children: PreconnectedCellTreeBranch[] = [];
-    function wrapup(inx: number): [PreconnectedCellTreeBranch, number] {
+
+    // Helper function to wrap up the constructed cell tree branch and index.
+    const wrapup = (inx: number): [PreconnectedCellTreeBranch, number] => {
       const tree: PreconnectedCellTreeBranch = {
+        [cellTreeBrand]: true,
         cell: parentCell,
         children,
         root: false,
       };
       return [tree, inx];
-    }
+    };
+
+    // Scans forward across cells recursively parsing
+    // as PreconnectedCellTreeBranch. Jumps forward the number
+    // of cells consumed by each deeper parse call.
     let i = cellInx + 1;
     while (i < cells.length) {
       const maybeChildCell = cells[i];
       if (isHeadlineCell(maybeChildCell)) {
-        const cmdl = concludingMarkdownLevel(
-          maybeChildCell.document.getText(),
-          0 as any
-        );
+        const cmdl = concludingMarkdownLevel(maybeChildCell.document.getText(), 0);
         if (parentCmdl < cmdl) {
           const [childTree, j] = preconnectedCellTree(cells, i);
           children.push(childTree);
           i = j;
         } else {
-          // We've reached a headline cell "above" the current cell;
-          // don't increment i, because it's at the place the next
-          // parse should start
           return wrapup(i);
         }
       } else {
@@ -167,7 +199,10 @@ function preconnectedCellTree(
     }
     return wrapup(i);
   } else {
-    return [{ cell: parentCell, root: false, children: [] }, cellInx + 1];
+    return [
+      { [cellTreeBrand]: true, cell: parentCell, root: false, children: [] },
+      cellInx + 1,
+    ];
   }
 }
 
@@ -189,7 +224,11 @@ function parseCellTree(notebook: vscode.NotebookEditor): CellTreeRoot {
     i = j;
   }
   // more legerdemain
-  const root: CellTreeRoot = { root: true, children: [] };
+  const root: CellTreeRoot = {
+    root: true,
+    children: [],
+    [cellTreeBrand]: true,
+  };
   const childrenCells = preconnectedCells.map((pctb) =>
     connectCellTree(root, pctb)
   );
@@ -209,29 +248,35 @@ function getCell(cellTree: CellTree): vscode.NotebookCell | null {
 }
 
 function cellTreeCells(tree: CellTree): vscode.NotebookCell[] {
-  const cells = tree.children.flatMap(cellTreeCells);
-  if (tree.root) {
-    return cells;
-  }
-  cells.unshift(tree.cell);
-  return cells;
+  return [
+    ...filterGenerator(
+      mapGenerator(depthFirstTraversal(tree), getCell),
+      isNonNullable
+    ),
+  ];
 }
 
 function findCellTree(
   cell: vscode.NotebookCell,
   cellTree: CellTree
 ): CellTreeBranch | null {
-  // pre-order depth-first search
-  if (!cellTree.root && cellTree.cell === cell) {
-    return cellTree;
-  }
-  for (const ct of cellTree.children) {
-    const v = findCellTree(cell, ct);
-    if (v !== null) {
-      return v;
+  for (const t of depthFirstTraversal(cellTree)) {
+    if (!t.root && t.cell === cell) {
+      return t;
     }
   }
   return null;
+}
+
+
+function depthOfTreeNode(cellTree: CellTree): number {
+  let d = -1;
+  let t: CellTree | null = cellTree;
+  while (t) {
+    d++;
+    t = getParent(t);
+  }
+  return d;
 }
 
 /**
@@ -341,12 +386,14 @@ function resolveNotebookCell(
  * @param startCell - The start cell or its index of the selection range.
  * @param endCell - The end cell or its index of the selection range.
  * @param notebook - (Optional) The notebook editor in which to set the selection range. If not provided or null, the active notebook editor will be used.
+ * @param reveal - (Optional) Whether the editor should reveal the selection. Default: true.
  * @throws Error if the notebook editor or the cells cannot be found.
  */
 function setSelectionInclusiveCellRange(
   startCell: vscode.NotebookCell | number,
   endCell: vscode.NotebookCell | number,
-  notebook?: vscode.NotebookEditor | null
+  notebook?: vscode.NotebookEditor | null,
+  reveal: boolean = true
 ): void {
   const notebook2 = providedOrActiveNotebook(notebook);
   if (notebook2 == null) {
@@ -357,10 +404,11 @@ function setSelectionInclusiveCellRange(
   if (startCell2 == null || endCell2 == null) {
     throw new Error("Cannot find cells.");
   }
-  notebook2.selection = new vscode.NotebookRange(
-    startCell2.index,
-    endCell2.index + 1
-  );
+  const range = new vscode.NotebookRange(startCell2.index, endCell2.index + 1);
+  notebook2.selection = range;
+  if (reveal) {
+    notebook2.revealRange(range);
+  }
 }
 
 function selectCellTree(cellTree: CellTree): void {
@@ -425,33 +473,130 @@ function selectSiblings(notebook: vscode.NotebookEditor): void {
  * gotos
  *******************************/
 
-function gotoCell(cell: vscode.NotebookCell): void {
-  const notebook = providedOrActiveNotebook();
-  if (notebook === null) {
-    return;
+function gotoCell(
+  cellOrTree: vscode.NotebookCell | CellTree | undefined | null
+): void {
+  if (cellOrTree != null) {
+    let cell: vscode.NotebookCell;
+    if (isCellTree(cellOrTree)) {
+      if (cellOrTree.root) {
+        return;
+      }
+      cell = cellOrTree.cell;
+    } else {
+      cell = cellOrTree;
+    }
+    setSelectionInclusiveCellRange(cell, cell);
   }
-  const range = new vscode.NotebookRange(cell.index, cell.index + 1);
-  notebook.selection = range;
-  notebook.revealRange(range);
+}
+
+function getParent(t: CellTree | null): CellTree | null {
+  if (t == null) {
+    return null;
+  }
+  if (!t.root) {
+    return t.parent;
+  }
+  return null;
 }
 
 function gotoParentCell(): void {
+  gotoCell(getParent(cellTree(selectedCell())));
+}
+
+function gotoForwardAndUp(): void {
+  const tree = cellTree(selectedCell());
+  if (tree == null) {
+    return;
+  } 
+  gotoCell(forwardAndUpTraversal(tree).next().value || null);
+}
+
+function gotoBackwardAndUp(): void {
   const tree = cellTree(selectedCell());
   if (tree === null) {
     return;
   }
-  const p = tree.parent;
-  if (p.root) {
+  gotoCell(backwardAndUpTraversal(tree).next().value || null);
+}
+
+function gotoForwardAndOver(): void {
+  const tree = cellTree(selectedCell());
+  if (tree == null) {
     return;
   }
-  setSelectionInclusiveCellRange(p.cell, p.cell);
+  gotoCell(forwardAndOverTraversal(tree).next().value || null);
+}
+
+function gotoNextBreadthFirst(): void {
+  const tree = cellTree(selectedCell());
+  if (tree == null) {
+    return;
+  }
+  gotoCell(breadthFirstTraversal(tree).next().value || null);
+}
+
+function gotoNextDepthFirst(): void {
+  const tree = cellTree(selectedCell());
+  if (tree == null) {
+    return;
+  }
+  gotoCell(depthFirstTraversal(tree).next().value || null);
+}
+
+/********************************
+ * Edits
+ *******************************/
+
+async function insertMarkdownCell(position: number): Promise<vscode.NotebookCell> {
+  const notebook = enforcePresence(providedOrActiveNotebook());
+  await vscode.commands.executeCommand('notebook.cell.quitEdit');
+  
+  if (position === 0) {
+    await vscode.commands.executeCommand('notebook.cell.insertMarkdownCellAtTop');
+  } else {
+    const predecessorCell = notebook.notebook.cellAt(position - 1);
+    notebook.selection = new vscode.NotebookRange(predecessorCell.index, predecessorCell.index + 1);
+    await vscode.commands.executeCommand('notebook.cell.insertMarkdownCellBelow');
+  }
+  return notebook.notebook.cellAt(position);
+}
+
+
+/**
+ * 
+ * This one is buggy. Sometimes the headline `#`s don't get inserted, sometimes
+ * they do. For whatever reason, once they start working they seem to keep working.
+ * No idea.
+ * @param position 
+ */
+async function insertHeadingAtIndex(position: number) {
+  const notebook = enforcePresence(providedOrActiveNotebook());
+  const cell = await insertMarkdownCell(position);
+  const t = cellTree(cell, notebook)!;
+  const depth = depthOfTreeNode(t);
+  console.log(`depth: ${depth}`);
+  notebook.selection = new vscode.NotebookRange(cell.index, cell.index + 1);
+  // await vscode.commands.executeCommand('jupyter.selectCellContents');
+  // await vscode.commands.executeCommand('jupyter.selectCell');
+  await vscode.commands.executeCommand('notebook.cell.edit');
+  const text = '#'.repeat(depth - 1) + ' '; 
+  // console.log('text:', text);
+  await vscode.commands.executeCommand('type', { text });
+  // console.log('typed! hopefully');
+}
+
+async function insertHeadingBelow() {
+  const cell = selectedCell();
+  if (!cell) {
+    return;
+  }
+  insertHeadingAtIndex(cell.index + 1);
 }
 
 /********************************
  * Activation
  *******************************/
-
-const disposables: vscode.Disposable[] = [];
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -459,28 +604,28 @@ export function activate(context: vscode.ExtensionContext) {
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with registerCommand
   // The commandId parameter must match the command field in package.json
-  let disposable = vscode.commands.registerCommand(
-    notebookSubtreeSelectCommandName,
-    () => {
-      selectSubtree();
-    }
-  );
 
-  disposables.push(disposable);
+  // Define command-function pairs
+  const commands = [
+    [notebookSubtreeSelectCommandName, selectSubtree],
+    [gotoParentCellName, gotoParentCell],
+    [gotoForwardAndUpCommandName, gotoForwardAndUp],
+    [gotoBackwardAndUpCommandName, gotoBackwardAndUp],
+    [gotoForwardAndOverCommandName, gotoForwardAndOver],
+    [gotoNextBreadthFirstCommandName, gotoNextBreadthFirst],
+    [gotoNextDepthFirstCommandName, gotoNextDepthFirst],
+    [insertHeadingBelowCommandName, insertHeadingBelow]
+  ] as const;
 
-  disposable = vscode.commands.registerCommand(gotoParentCellName, () => {
-    gotoParentCell();
-  });
-  disposables.push(disposable);
-
-  context.subscriptions.push(disposable);
+  // Register each command
+  for (const [commandName, commandFunc] of commands) {
+    const disposable = vscode.commands.registerCommand(
+      commandName,
+      commandFunc
+    );
+    context.subscriptions.push(disposable);
+  }
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {
-  // not sure I really need to do this
-  for (const disposable of disposables) {
-    disposable.dispose();
-  }
-  disposables.length = 0;
-}
+export function deactivate() {}
