@@ -656,21 +656,25 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('No active notebook editor');
         return;
       }
+      const cells = selectedCells().filter(isHeadlineCell);
+      
+      if (cells.length === 0) {
+        return;
+      }
 
-      const cells = selectedCells();
+      const edit = new vscode.WorkspaceEdit();
 
       for (const cell of cells) {
         const oldText = cell.document.getText();
         const newText = adjustHeadingLevels(oldText, 1);
-  
-        const edit = new vscode.WorkspaceEdit();
         edit.replace(cell.document.uri, new vscode.Range(0, 0, cell.document.lineCount, 0), newText);
-        await vscode.workspace.applyEdit(edit);
-        
-        setSelectionInclusiveCellRange(cell, cell, notebook, false);
-        await vscode.commands.executeCommand('notebook.cell.edit');
-        await vscode.commands.executeCommand('notebook.cell.quitEdit');
       }
+
+      await vscode.workspace.applyEdit(edit);
+      const firstCell = cells[0];
+      setSelectionInclusiveCellRange(firstCell, firstCell, notebook, false);
+      await vscode.commands.executeCommand('notebook.cell.edit');
+      await vscode.commands.executeCommand('notebook.cell.quitEdit');
      
     }]
   ] as const;
