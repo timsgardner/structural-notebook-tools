@@ -52,6 +52,11 @@
         "command": "notebook-subtree-select.insertHeadingBelow",
         "title": "Insert notebook heading below",
         "description": "Inserts a heading cell below the current cell in the notebook"
+      },
+      {
+        "command": "notebook-subtree-select.incrementHeading",
+        "title": "Increment heading",
+        "description": "afadfas"
       }
     ]
   },
@@ -84,6 +89,9 @@
     "webpack-cli": "^5.0.2"
   },
   "dependencies": {
-    "marked": "^5.0.3"
+    "@types/vscode-notebook-renderer": "^1.72.0",
+    "marked": "^5.0.3",
+    "remark": "^14.0.3",
+    "unist-util-visit": "^4.1.2"
   }
 }

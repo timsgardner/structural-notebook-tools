@@ -1,8 +1,12 @@
 // The module 'vscode' contains the VS Code extensibility API
+// TODO: consider using unified for the traversal and tree stuff
+// TODO: replace marked with remark
 import * as vscode from "vscode";
 import * as marked from "marked";
 import { getTraversalFunctions } from "./traversals";
 import { mapGenerator, filterGenerator, isNonNullable, enforcePresence } from "./utils";
+import {visit} from 'unist-util-visit';
+import {remark} from 'remark';
 
 const notebookSubtreeSelectCommandName =
   "notebook-subtree-select.notebookSubtreeSelect" as const;
@@ -64,12 +68,32 @@ const {
 );
 
 /********************************
- * Parse notebook tree
+ * markdown wrangling
  *******************************/
 
 function makeMarkedInstance() {
   return marked.marked.setOptions({ mangle: false, headerIds: false });
 }
+
+function adjustHeadingLevels(markdown: string, change: number) {
+  // Parse the markdown into an AST
+  const ast = remark.parse(markdown);
+
+  // Traverse the AST and adjust the heading levels
+  visit(ast, 'heading', node => {
+    node.depth = Math.max(1, Math.min(node.depth + change, 6)) as any;
+  });
+
+  // Serialize the AST back into a markdown string
+  const newMarkdown = remark.stringify(ast);
+
+  return newMarkdown;
+}
+
+
+/********************************
+ * Parse notebook tree
+ *******************************/
 
 /**
  * Determines the concluding Markdown level of a given text starting from a specified Markdown level.
@@ -445,6 +469,16 @@ function selectedCell(
   return null;
 }
 
+// TODO: make signature consistent with selectedCell
+function selectedCells(): vscode.NotebookCell[] {
+  const notebook = enforcePresence(providedOrActiveNotebook());
+  const cells: vscode.NotebookCell[] = [];
+  for (let i = notebook.selection.start; i < notebook.selection.end; i++) {
+    cells.push(notebook.notebook.cellAt(i));
+  }
+  return cells;
+}
+
 /********************************
  * Selectors
  *******************************/
@@ -594,6 +628,7 @@ async function insertHeadingBelow() {
   insertHeadingAtIndex(cell.index + 1);
 }
 
+
 /********************************
  * Activation
  *******************************/
@@ -614,7 +649,30 @@ export function activate(context: vscode.ExtensionContext) {
     [gotoForwardAndOverCommandName, gotoForwardAndOver],
     [gotoNextBreadthFirstCommandName, gotoNextBreadthFirst],
     [gotoNextDepthFirstCommandName, gotoNextDepthFirst],
-    [insertHeadingBelowCommandName, insertHeadingBelow]
+    [insertHeadingBelowCommandName, insertHeadingBelow],
+    ["notebook-subtree-select.incrementHeading", async () => {
+      const notebook = vscode.window.activeNotebookEditor;
+      if (!notebook) {
+        vscode.window.showInformationMessage('No active notebook editor');
+        return;
+      }
+
+      const cells = selectedCells();
+
+      for (const cell of cells) {
+        const oldText = cell.document.getText();
+        const newText = adjustHeadingLevels(oldText, 1);
+  
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(cell.document.uri, new vscode.Range(0, 0, cell.document.lineCount, 0), newText);
+        await vscode.workspace.applyEdit(edit);
+        
+        setSelectionInclusiveCellRange(cell, cell, notebook, false);
+        await vscode.commands.executeCommand('notebook.cell.edit');
+        await vscode.commands.executeCommand('notebook.cell.quitEdit');
+      }
+     
+    }]
   ] as const;
 
   // Register each command
