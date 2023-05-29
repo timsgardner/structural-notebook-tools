@@ -82,7 +82,7 @@ function* depthFirstTraversal<T>(
   for (let child of children) {
     yield* depthFirstTraversalDown(child, getChildren);
   }
- 
+
   // walk upwards
   let currentNode = startNode;
   for (
@@ -123,6 +123,7 @@ interface TraversalFunctions<T> {
   backwardAndUpTraversal: (startNode: T) => Generator<T, void, unknown>;
   forwardAndOverTraversal: (startNode: T) => Generator<T, void, unknown>;
   forwardAndUpTraversal: (startNode: T) => Generator<T, void, unknown>;
+  depthFirstTraversalDown: (startNode: T) => Generator<T, void, unknown>;
 }
 
 function getTraversalFunctions<T>(
@@ -140,6 +141,8 @@ function getTraversalFunctions<T>(
       forwardAndOverTraversal(startNode, getParent, getChildren),
     forwardAndUpTraversal: (startNode: T) =>
       forwardAndUpTraversal(startNode, getParent, getChildren),
+    depthFirstTraversalDown: (startNode: T) =>
+      depthFirstTraversalDown(startNode, getChildren),
   };
 }
 

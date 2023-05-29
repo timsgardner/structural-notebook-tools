@@ -69,6 +69,7 @@ const {
   depthFirstTraversal,
   forwardAndOverTraversal,
   forwardAndUpTraversal,
+  depthFirstTraversalDown,
 } = getTraversalFunctions(
   (t: CellTree) => (t.root ? null : t.parent),
   (t: CellTree) => t.children
@@ -286,7 +287,7 @@ function getCell(cellTree: CellTree): vscode.NotebookCell | null {
 function cellTreeCells(tree: CellTree): vscode.NotebookCell[] {
   return [
     ...filterGenerator(
-      mapGenerator(depthFirstTraversal(tree), getCell),
+      mapGenerator(depthFirstTraversalDown(tree), getCell),
       isNonNullable
     ),
   ];
