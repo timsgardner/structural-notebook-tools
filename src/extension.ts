@@ -4,9 +4,16 @@
 import * as vscode from "vscode";
 import * as marked from "marked";
 import { getTraversalFunctions } from "./traversals";
-import { mapGenerator, filterGenerator, isNonNullable, enforcePresence } from "./utils";
-import {visit} from 'unist-util-visit';
-import {remark} from 'remark';
+import {
+  mapGenerator,
+  filterGenerator,
+  isNonNullable,
+  enforcePresence,
+  getNthGeneratorItem,
+  skipUntilItem,
+} from "./utils";
+import { visit } from "unist-util-visit";
+import { remark } from "remark";
 
 const notebookSubtreeSelectCommandName =
   "notebook-subtree-select.notebookSubtreeSelect" as const;
@@ -80,7 +87,7 @@ function adjustHeadingLevels(markdown: string, change: number) {
   const ast = remark.parse(markdown);
 
   // Traverse the AST and adjust the heading levels
-  visit(ast, 'heading', node => {
+  visit(ast, "heading", (node) => {
     node.depth = Math.max(1, Math.min(node.depth + change, 6)) as any;
   });
 
@@ -89,7 +96,6 @@ function adjustHeadingLevels(markdown: string, change: number) {
 
   return newMarkdown;
 }
-
 
 /********************************
  * Parse notebook tree
@@ -174,10 +180,10 @@ function connectCellTree(
  * Returns the tree without the parent connections.
  * We add those in the next step in `parseCellTree`.
  * Makes the recursion a little less annoying.
- * 
+ *
  * @param cells - Array of NotebookCells to parse as a tree.
  * @param cellInx - Index of the current cell.
- * 
+ *
  * @returns Array containing the preconnected cell tree branch and the next index.
  */
 function preconnectedCellTree(
@@ -186,7 +192,10 @@ function preconnectedCellTree(
 ): [PreconnectedCellTreeBranch, number] {
   const parentCell = cells[cellInx];
   if (isHeadlineCell(parentCell)) {
-    const parentCmdl = concludingMarkdownLevel(parentCell.document.getText(), 0);
+    const parentCmdl = concludingMarkdownLevel(
+      parentCell.document.getText(),
+      0
+    );
     const children: PreconnectedCellTreeBranch[] = [];
 
     // Helper function to wrap up the constructed cell tree branch and index.
@@ -207,7 +216,10 @@ function preconnectedCellTree(
     while (i < cells.length) {
       const maybeChildCell = cells[i];
       if (isHeadlineCell(maybeChildCell)) {
-        const cmdl = concludingMarkdownLevel(maybeChildCell.document.getText(), 0);
+        const cmdl = concludingMarkdownLevel(
+          maybeChildCell.document.getText(),
+          0
+        );
         if (parentCmdl < cmdl) {
           const [childTree, j] = preconnectedCellTree(cells, i);
           children.push(childTree);
@@ -291,7 +303,6 @@ function findCellTree(
   }
   return null;
 }
-
 
 function depthOfTreeNode(cellTree: CellTree): number {
   let d = -1;
@@ -522,6 +533,7 @@ function gotoCell(
     }
     setSelectionInclusiveCellRange(cell, cell);
   }
+  console.log("gotoCell: cellOrTree null");
 }
 
 function getParent(t: CellTree | null): CellTree | null {
@@ -534,6 +546,13 @@ function getParent(t: CellTree | null): CellTree | null {
   return null;
 }
 
+function getRoot(t: CellTree): CellTreeRoot {
+  if (t.root) {
+    return t;
+  }
+  return getRoot(t.parent);
+}
+
 function gotoParentCell(): void {
   gotoCell(getParent(cellTree(selectedCell())));
 }
@@ -542,8 +561,13 @@ function gotoForwardAndUp(): void {
   const tree = cellTree(selectedCell());
   if (tree == null) {
     return;
-  } 
-  gotoCell(forwardAndUpTraversal(tree).next().value || null);
+  }
+  gotoCell(
+    getNthGeneratorItem(
+      skipUntilItem(forwardAndUpTraversal(getRoot(tree)), tree),
+      2
+    )
+  );
 }
 
 function gotoBackwardAndUp(): void {
@@ -551,15 +575,27 @@ function gotoBackwardAndUp(): void {
   if (tree === null) {
     return;
   }
-  gotoCell(backwardAndUpTraversal(tree).next().value || null);
+  gotoCell(
+    getNthGeneratorItem(
+      skipUntilItem(backwardAndUpTraversal(getRoot(tree)), tree),
+      2
+    )
+  );
 }
 
 function gotoForwardAndOver(): void {
   const tree = cellTree(selectedCell());
   if (tree == null) {
+    console.log("null tree");
     return;
   }
-  gotoCell(forwardAndOverTraversal(tree).next().value || null);
+  const r = getRoot(tree);
+  gotoCell(
+    getNthGeneratorItem(
+      forwardAndOverTraversal(tree),
+      1
+    )
+  );
 }
 
 function gotoNextBreadthFirst(): void {
@@ -567,7 +603,12 @@ function gotoNextBreadthFirst(): void {
   if (tree == null) {
     return;
   }
-  gotoCell(breadthFirstTraversal(tree).next().value || null);
+  gotoCell(
+    getNthGeneratorItem(
+      skipUntilItem(breadthFirstTraversal(getRoot(tree)), tree),
+      1
+    )
+  );
 }
 
 function gotoNextDepthFirst(): void {
@@ -575,34 +616,43 @@ function gotoNextDepthFirst(): void {
   if (tree == null) {
     return;
   }
-  gotoCell(depthFirstTraversal(tree).next().value || null);
+  // here I bothered to define the traversal both up and down
+  gotoCell(getNthGeneratorItem(depthFirstTraversal(tree), 2));
 }
 
 /********************************
  * Edits
  *******************************/
 
-async function insertMarkdownCell(position: number): Promise<vscode.NotebookCell> {
+async function insertMarkdownCell(
+  position: number
+): Promise<vscode.NotebookCell> {
   const notebook = enforcePresence(providedOrActiveNotebook());
-  await vscode.commands.executeCommand('notebook.cell.quitEdit');
-  
+  await vscode.commands.executeCommand("notebook.cell.quitEdit");
+
   if (position === 0) {
-    await vscode.commands.executeCommand('notebook.cell.insertMarkdownCellAtTop');
+    await vscode.commands.executeCommand(
+      "notebook.cell.insertMarkdownCellAtTop"
+    );
   } else {
     const predecessorCell = notebook.notebook.cellAt(position - 1);
-    notebook.selection = new vscode.NotebookRange(predecessorCell.index, predecessorCell.index + 1);
-    await vscode.commands.executeCommand('notebook.cell.insertMarkdownCellBelow');
+    notebook.selection = new vscode.NotebookRange(
+      predecessorCell.index,
+      predecessorCell.index + 1
+    );
+    await vscode.commands.executeCommand(
+      "notebook.cell.insertMarkdownCellBelow"
+    );
   }
   return notebook.notebook.cellAt(position);
 }
 
-
 /**
- * 
+ *
  * This one is buggy. Sometimes the headline `#`s don't get inserted, sometimes
  * they do. For whatever reason, once they start working they seem to keep working.
  * No idea.
- * @param position 
+ * @param position
  */
 async function insertHeadingAtIndex(position: number) {
   const notebook = enforcePresence(providedOrActiveNotebook());
@@ -613,10 +663,10 @@ async function insertHeadingAtIndex(position: number) {
   notebook.selection = new vscode.NotebookRange(cell.index, cell.index + 1);
   // await vscode.commands.executeCommand('jupyter.selectCellContents');
   // await vscode.commands.executeCommand('jupyter.selectCell');
-  await vscode.commands.executeCommand('notebook.cell.edit');
-  const text = '#'.repeat(depth - 1) + ' '; 
+  await vscode.commands.executeCommand("notebook.cell.edit");
+  const text = "#".repeat(depth - 1) + " ";
   // console.log('text:', text);
-  await vscode.commands.executeCommand('type', { text });
+  await vscode.commands.executeCommand("type", { text });
   // console.log('typed! hopefully');
 }
 
@@ -627,7 +677,6 @@ async function insertHeadingBelow() {
   }
   insertHeadingAtIndex(cell.index + 1);
 }
-
 
 /********************************
  * Activation
@@ -650,33 +699,39 @@ export function activate(context: vscode.ExtensionContext) {
     [gotoNextBreadthFirstCommandName, gotoNextBreadthFirst],
     [gotoNextDepthFirstCommandName, gotoNextDepthFirst],
     [insertHeadingBelowCommandName, insertHeadingBelow],
-    ["notebook-subtree-select.incrementHeading", async () => {
-      const notebook = vscode.window.activeNotebookEditor;
-      if (!notebook) {
-        vscode.window.showInformationMessage('No active notebook editor');
-        return;
-      }
-      const cells = selectedCells().filter(isHeadlineCell);
-      
-      if (cells.length === 0) {
-        return;
-      }
+    [
+      "notebook-subtree-select.incrementHeading",
+      async () => {
+        const notebook = vscode.window.activeNotebookEditor;
+        if (!notebook) {
+          vscode.window.showInformationMessage("No active notebook editor");
+          return;
+        }
+        const cells = selectedCells().filter(isHeadlineCell);
 
-      const edit = new vscode.WorkspaceEdit();
+        if (cells.length === 0) {
+          return;
+        }
 
-      for (const cell of cells) {
-        const oldText = cell.document.getText();
-        const newText = adjustHeadingLevels(oldText, 1);
-        edit.replace(cell.document.uri, new vscode.Range(0, 0, cell.document.lineCount, 0), newText);
-      }
+        const edit = new vscode.WorkspaceEdit();
 
-      await vscode.workspace.applyEdit(edit);
-      const firstCell = cells[0];
-      setSelectionInclusiveCellRange(firstCell, firstCell, notebook, false);
-      await vscode.commands.executeCommand('notebook.cell.edit');
-      await vscode.commands.executeCommand('notebook.cell.quitEdit');
-     
-    }]
+        for (const cell of cells) {
+          const oldText = cell.document.getText();
+          const newText = adjustHeadingLevels(oldText, 1);
+          edit.replace(
+            cell.document.uri,
+            new vscode.Range(0, 0, cell.document.lineCount, 0),
+            newText
+          );
+        }
+
+        await vscode.workspace.applyEdit(edit);
+        const firstCell = cells[0];
+        setSelectionInclusiveCellRange(firstCell, firstCell, notebook, false);
+        await vscode.commands.executeCommand("notebook.cell.edit");
+        await vscode.commands.executeCommand("notebook.cell.quitEdit");
+      },
+    ],
   ] as const;
 
   // Register each command

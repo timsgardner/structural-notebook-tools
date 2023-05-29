@@ -50,4 +50,57 @@ function enforcePresence<T>(x: T): NonNullable<T> {
   throw TypeError('Expected a non-null, non-undefined value, but got null or undefined');
 }
 
-export { mapGenerator, filterGenerator, isNonNullable, enforcePresence };
+function getNthGeneratorItem<T>(generator: Generator<T>, n: number): T | null {
+  let currentIndex = 0;
+  let result: IteratorResult<T>;
+
+  while (currentIndex <= n) {
+    result = generator.next();
+
+    if (result.done) {
+      // Generator finished before reaching the nth item
+      return null;
+    }
+
+    if (currentIndex === n) {
+      // Found the nth item
+      return result.value;
+    }
+
+    currentIndex++;
+  }
+
+  // Generator exhausted before reaching the nth item
+  return null;
+}
+
+/**
+ * Obviously inefficient for traversals, but easier than
+ * defining up and down directions for picking up traversals
+ * at some middle element, and in this context that kind of 
+ * efficiency REALLY doesn't matter
+ * @param generator 
+ * @param item 
+ * @returns 
+ */
+function* skipUntilItem<T>(generator: Generator<T>, item: T): Generator<T> {
+  let result = generator.next();
+  while (!result.done && result.value !== item) {
+      result = generator.next();
+  }
+
+  // Check if we've found the item
+  if(result.done) {
+      return; // If end of the generator is reached
+  } else {
+      yield result.value; // Yield the matched item
+  }
+
+  // Yield remaining values from the original generator
+  for (let value of generator) {
+      yield value;
+  }
+}
+
+
+export { mapGenerator, filterGenerator, isNonNullable, enforcePresence, getNthGeneratorItem, skipUntilItem };

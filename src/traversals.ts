@@ -59,35 +59,31 @@ function* backwardAndUpTraversal<T>(
   }
 }
 
+// come to think, you could implement a depth first traversal
+// with this as the up step
 function* forwardAndOverTraversal<T>(
   startNode: T,
   getParent: NodeAccessor<T>,
   getChildren: ChildrenAccessor<T>
 ): Generator<T, void, unknown> {
-  let currentNode: T | null = startNode;
-
-  while (currentNode) {
-    yield currentNode;
-
-    let nextNode: T | null = null;
-    let potentialParent: T | null = currentNode;
-
-    while (!nextNode && potentialParent) {
-      const siblings: T[] = getSiblings(potentialParent, getParent, getChildren);
-      const currentIndex = siblings.indexOf(potentialParent);
-
-      if (currentIndex < siblings.length - 1) {
-        nextNode = siblings[currentIndex + 1];
-      } else {
-        potentialParent = getParent(potentialParent);
-      }
-    }
-
-    currentNode = nextNode;
+  yield startNode;
+  const parent = getParent(startNode);
+  if (!parent) {
+    return;
   }
+  const siblings = getSiblings(startNode, getParent, getChildren);
+  const startInx = siblings.indexOf(startNode);
+  for (let i = startInx + 1; i < siblings.length; i++) {
+    yield siblings[i];
+  }
+  const g = forwardAndOverTraversal(parent, getParent, getChildren);
+  // skip parent
+  g.next();
+  // carry on
+  yield* g;
 }
 
-function* depthFirstTraversal<T>(
+function* depthFirstTraversalDown<T>(
   startNode: T,
   getChildren: ChildrenAccessor<T>
 ): Generator<T, void, unknown> {
@@ -95,7 +91,35 @@ function* depthFirstTraversal<T>(
 
   const children = getChildren(startNode);
   for (let child of children) {
-    yield* depthFirstTraversal(child, getChildren);
+    yield* depthFirstTraversalDown(child, getChildren);
+  }
+}
+
+function* depthFirstTraversal<T>(
+  startNode: T,
+  getParent: NodeAccessor<T>,
+  getChildren: ChildrenAccessor<T>
+): Generator<T, void, unknown> {
+  yield startNode;
+
+  const children = getChildren(startNode);
+  for (let child of children) {
+    yield* depthFirstTraversalDown(child, getChildren);
+  }
+ 
+  // walk upwards
+  let currentNode = startNode;
+  for (
+    let parentNode = getParent(currentNode);
+    parentNode !== null;
+    parentNode = getParent(currentNode)
+  ) {
+    const siblings = getChildren(parentNode);
+    const ownInx = siblings.indexOf(currentNode);
+    for (let i = ownInx + 1; i < siblings.length; i++) {
+      yield* depthFirstTraversalDown(siblings[i], getChildren);
+    }
+    currentNode = parentNode;
   }
 }
 
@@ -127,14 +151,19 @@ interface TraversalFunctions<T> {
 
 function getTraversalFunctions<T>(
   getParent: NodeAccessor<T>,
-  getChildren: ChildrenAccessor<T>,
+  getChildren: ChildrenAccessor<T>
 ): TraversalFunctions<T> {
   return {
-    breadthFirstTraversal: (startNode: T) => breadthFirstTraversal(startNode, getChildren),
-    depthFirstTraversal: (startNode: T) => depthFirstTraversal(startNode, getChildren),
-    backwardAndUpTraversal: (startNode: T) => backwardAndUpTraversal(startNode, getParent, getChildren),
-    forwardAndOverTraversal: (startNode: T) => forwardAndOverTraversal(startNode, getParent, getChildren),
-    forwardAndUpTraversal: (startNode: T) => forwardAndUpTraversal(startNode, getParent, getChildren),
+    breadthFirstTraversal: (startNode: T) =>
+      breadthFirstTraversal(startNode, getChildren),
+    depthFirstTraversal: (startNode: T) =>
+      depthFirstTraversal(startNode, getParent, getChildren),
+    backwardAndUpTraversal: (startNode: T) =>
+      backwardAndUpTraversal(startNode, getParent, getChildren),
+    forwardAndOverTraversal: (startNode: T) =>
+      forwardAndOverTraversal(startNode, getParent, getChildren),
+    forwardAndUpTraversal: (startNode: T) =>
+      forwardAndUpTraversal(startNode, getParent, getChildren),
   };
 }
 
