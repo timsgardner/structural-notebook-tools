@@ -1,41 +1,21 @@
 type NodeAccessor<T> = (node: T) => T | null;
 type ChildrenAccessor<T> = (node: T) => T[];
 
-function getSiblings<T>(
-  node: T,
-  getParent: NodeAccessor<T>,
-  getChildren: ChildrenAccessor<T>
-): T[] {
-  const p = getParent(node);
-  if (p != null) {
-    return getChildren(p);
-  }
-  return [];
-}
-
 function* forwardAndUpTraversal<T>(
   startNode: T,
   getParent: NodeAccessor<T>,
   getChildren: ChildrenAccessor<T>
 ): Generator<T, void, unknown> {
-  let currentNode: T | null = startNode;
-
-  while (currentNode) {
-    yield currentNode;
-
-    if (getParent(currentNode)) {
-      const siblings: T[] = getSiblings(currentNode, getParent, getChildren);
-      const currentIndex = siblings.indexOf(currentNode);
-
-      if (currentIndex < siblings.length - 1) {
-        currentNode = siblings[currentIndex + 1];
-      } else {
-        currentNode = getParent(currentNode);
-      }
-    } else {
-      currentNode = null;
-    }
+  yield startNode;
+  const parent = getParent(startNode);
+  if (!parent) {
+    return;
   }
+  const siblings = getChildren(parent);
+  for (let i = siblings.indexOf(startNode) + 1; i < siblings.length; i++) {
+    yield siblings[i];
+  }
+  yield* forwardAndUpTraversal(parent, getParent, getChildren);
 }
 
 function* backwardAndUpTraversal<T>(
@@ -43,20 +23,16 @@ function* backwardAndUpTraversal<T>(
   getParent: NodeAccessor<T>,
   getChildren: ChildrenAccessor<T>
 ): Generator<T, void, unknown> {
-  let currentNode: T | null = startNode;
-
-  while (currentNode) {
-    yield currentNode;
-
-    const siblings: T[] = getSiblings(currentNode, getParent, getChildren);
-    const currentIndex = siblings.indexOf(currentNode);
-
-    if (currentIndex > 0) {
-      currentNode = siblings[currentIndex - 1];
-    } else {
-      currentNode = getParent(currentNode);
-    }
+  yield startNode;
+  const parent = getParent(startNode);
+  if (!parent) {
+    return;
   }
+  const siblings = getChildren(parent);
+  for (let i = siblings.indexOf(startNode) - 1; i > 0; i--) {
+    yield siblings[i];
+  }
+  yield* backwardAndUpTraversal(parent, getParent, getChildren);
 }
 
 // come to think, you could implement a depth first traversal
@@ -71,7 +47,7 @@ function* forwardAndOverTraversal<T>(
   if (!parent) {
     return;
   }
-  const siblings = getSiblings(startNode, getParent, getChildren);
+  const siblings = getChildren(parent);
   const startInx = siblings.indexOf(startNode);
   for (let i = startInx + 1; i < siblings.length; i++) {
     yield siblings[i];

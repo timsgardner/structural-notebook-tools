@@ -562,12 +562,7 @@ function gotoForwardAndUp(): void {
   if (tree == null) {
     return;
   }
-  gotoCell(
-    getNthGeneratorItem(
-      skipUntilItem(forwardAndUpTraversal(getRoot(tree)), tree),
-      2
-    )
-  );
+  gotoCell(getNthGeneratorItem(forwardAndUpTraversal(tree), 1));
 }
 
 function gotoBackwardAndUp(): void {
@@ -575,12 +570,7 @@ function gotoBackwardAndUp(): void {
   if (tree === null) {
     return;
   }
-  gotoCell(
-    getNthGeneratorItem(
-      skipUntilItem(backwardAndUpTraversal(getRoot(tree)), tree),
-      2
-    )
-  );
+  gotoCell(getNthGeneratorItem(backwardAndUpTraversal(tree), 1));
 }
 
 function gotoForwardAndOver(): void {
@@ -590,12 +580,7 @@ function gotoForwardAndOver(): void {
     return;
   }
   const r = getRoot(tree);
-  gotoCell(
-    getNthGeneratorItem(
-      forwardAndOverTraversal(tree),
-      1
-    )
-  );
+  gotoCell(getNthGeneratorItem(forwardAndOverTraversal(tree), 1));
 }
 
 function gotoNextBreadthFirst(): void {
