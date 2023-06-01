@@ -29,7 +29,7 @@ function* backwardAndUpTraversal<T>(
     return;
   }
   const siblings = getChildren(parent);
-  for (let i = siblings.indexOf(startNode) - 1; i > 0; i--) {
+  for (let i = siblings.indexOf(startNode) - 1; i >= 0; i--) {
     yield siblings[i];
   }
   yield* backwardAndUpTraversal(parent, getParent, getChildren);
