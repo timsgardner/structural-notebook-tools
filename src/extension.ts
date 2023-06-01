@@ -17,26 +17,26 @@ import { remark } from "remark";
 import G = require("glob");
 
 const notebookSubtreeSelectCommandName =
-  "notebook-subtree-select.notebookSubtreeSelect" as const;
-const gotoParentCellName = "notebook-subtree-select.gotoParentCell" as const;
+  "structural-notebook-tools.notebookSubtreeSelect" as const;
+const gotoParentCellName = "structural-notebook-tools.gotoParentCell" as const;
 const gotoForwardAndUpCommandName =
-  "notebook-subtree-select.gotoForwardAndUp" as const;
+  "structural-notebook-tools.gotoForwardAndUp" as const;
 const gotoBackwardAndUpCommandName =
-  "notebook-subtree-select.gotoBackwardAndUp" as const;
+  "structural-notebook-tools.gotoBackwardAndUp" as const;
 const gotoForwardAndOverCommandName =
-  "notebook-subtree-select.gotoForwardAndOver" as const;
+  "structural-notebook-tools.gotoForwardAndOver" as const;
 const gotoNextBreadthFirstCommandName =
-  "notebook-subtree-select.gotoNextBreadthFirst" as const;
+  "structural-notebook-tools.gotoNextBreadthFirst" as const;
 const gotoNextDepthFirstCommandName =
-  "notebook-subtree-select.gotoNextDepthFirst" as const;
+  "structural-notebook-tools.gotoNextDepthFirst" as const;
 const insertHeadingBelowCommandName =
-  "notebook-subtree-select.insertHeadingBelow" as const;
+  "structural-notebook-tools.insertHeadingBelow" as const;
 const incrementHeadingsCommandName =
-  "notebook-subtree-select.incrementHeading" as const;
+  "structural-notebook-tools.incrementHeading" as const;
 const decrementHeadingsCommandName =
-  "notebook-subtree-select.decrementHeading" as const;
+  "structural-notebook-tools.decrementHeading" as const;
 const gotoNextSlideDownCommandName =
-  "notebook-subtree-select.gotoNextSlideDown" as const;
+  "structural-notebook-tools.gotoNextSlideDown" as const;
 
 const cellTreeBrand = Symbol("IsCellTree");
 

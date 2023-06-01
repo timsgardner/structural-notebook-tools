@@ -1,7 +1,7 @@
 {
-  "name": "notebook-subtree-select",
-  "displayName": "Notebook Subtree Select",
-  "description": "Enables selection of subtrees of cells in notebooks (eg, Jupyter)",
+  "name": "structural-notebook-tools",
+  "displayName": "Structural Notebook Tools",
+  "description": "Structural Notebook Tools contributes a suite of structure-sensitive commands for nagivating and editing notebooks as trees.\n\nFollowing the hierarchy of cells implied by markdown heading levels, this extension enables the user to:\n\n- Rapidly traverse the implicit markdown tree structure\n\n- Select subtrees\n\n- Edit the headline levels of selected markdown cells",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.78.0"
@@ -14,90 +14,90 @@
   "contributes": {
     "keybindings": [
       {
-        "command": "notebook-subtree-select.notebookSubtreeSelect",
+        "command": "structural-notebook-tools.notebookSubtreeSelect",
         "key": "h",
         "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
-        "command": "notebook-subtree-select.gotoForwardAndOver",
+        "command": "structural-notebook-tools.gotoForwardAndOver",
         "key": "n",
         "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
-        "command": "notebook-subtree-select.gotoBackwardAndUp",
+        "command": "structural-notebook-tools.gotoBackwardAndUp",
         "key": "p",
         "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
-        "command": "notebook-subtree-select.gotoParentCell",
+        "command": "structural-notebook-tools.gotoParentCell",
         "key": "u",
         "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
-        "command": "notebook-subtree-select.gotoNextDepthFirst",
+        "command": "structural-notebook-tools.gotoNextDepthFirst",
         "key": "i",
         "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
-        "command": "notebook-subtree-select.gotoNextSlideDown",
+        "command": "structural-notebook-tools.gotoNextSlideDown",
         "key": "i",
         "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       }
     ],
     "commands": [
       {
-        "command": "notebook-subtree-select.notebookSubtreeSelect",
-        "title": "Select cell subtree",
+        "command": "structural-notebook-tools.notebookSubtreeSelect",
+        "title": "SNT: Select cell subtree",
         "description": "Selects the subtree of cells starting from the current cell"
       },
       {
-        "command": "notebook-subtree-select.gotoParentCell",
-        "title": "Go to next cell parent",
+        "command": "structural-notebook-tools.gotoParentCell",
+        "title": "SNT: Go to next cell parent",
         "description": "Navigates to the parent cell of the current cell"
       },
       {
-        "command": "notebook-subtree-select.gotoForwardAndUp",
-        "title": "Go to next cell forward and up",
+        "command": "structural-notebook-tools.gotoForwardAndUp",
+        "title": "SNT: Go to next cell forward and up",
         "description": "Moves to the next sibling cell if present, or to parent cell"
       },
       {
-        "command": "notebook-subtree-select.gotoBackwardAndUp",
-        "title": "Go to next cell backward and up",
+        "command": "structural-notebook-tools.gotoBackwardAndUp",
+        "title": "SNT: Go to next cell backward and up",
         "description": "Moves to the previous sibling cell if present, or to parent cell"
       },
       {
-        "command": "notebook-subtree-select.gotoForwardAndOver",
-        "title": "Go to next cell forward and over",
+        "command": "structural-notebook-tools.gotoForwardAndOver",
+        "title": "SNT: Go to next cell forward and over",
         "description": "Moves to the next sibling cell if present, or to parent cell's next sibling"
       },
       {
-        "command": "notebook-subtree-select.gotoNextBreadthFirst",
-        "title": "Go to next breadth-first cell",
+        "command": "structural-notebook-tools.gotoNextBreadthFirst",
+        "title": "SNT: Go to next breadth-first cell",
         "description": "Navigates to the next cell using a breadth-first traversal"
       },
       {
-        "command": "notebook-subtree-select.gotoNextDepthFirst",
-        "title": "Go to next depth-first cell",
+        "command": "structural-notebook-tools.gotoNextDepthFirst",
+        "title": "SNT: Go to next depth-first cell",
         "description": "Navigates to the next cell using a depth-first traversal"
       },
       {
-        "command": "notebook-subtree-select.insertHeadingBelow",
-        "title": "Insert notebook heading below",
+        "command": "structural-notebook-tools.insertHeadingBelow",
+        "title": "SNT: Insert notebook heading below",
         "description": "Inserts a heading cell below the current cell in the notebook"
       },
       {
-        "command": "notebook-subtree-select.incrementHeadings",
-        "title": "Increment headings",
+        "command": "structural-notebook-tools.incrementHeadings",
+        "title": "SNT: Increment headings",
         "description": "Increment the heading level of all selected markdown"
       },
       {
-        "command": "notebook-subtree-select.decrementHeadings",
-        "title": "Decrement headings",
+        "command": "structural-notebook-tools.decrementHeadings",
+        "title": "SNT: Decrement headings",
         "description": "Decrement the heading level of all selected markdown"
       },
       {
-        "command": "notebook-subtree-select.gotoNextSlideDown",
-        "title": "Go to next cell, sliding over and down"
+        "command": "structural-notebook-tools.gotoNextSlideDown",
+        "title": "SNT: Go to next cell, sliding over and down"
       }
     ]    
   },
