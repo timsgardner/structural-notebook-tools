@@ -1,7 +1,6 @@
 // The module 'vscode' contains the VS Code extensibility API
 // TODO: consider using unified for the traversal and tree stuff
 // TODO: replace marked with remark
-// TODO: cellTree doesn't need to return null
 import * as vscode from "vscode";
 import * as marked from "marked";
 import { getTraversalFunctions } from "./traversals";
@@ -36,7 +35,7 @@ const incrementHeadingsCommandName =
   "notebook-subtree-select.incrementHeading" as const;
 const decrementHeadingsCommandName =
   "notebook-subtree-select.decrementHeading" as const;
-  const gotoNextSlideDownCommandName =
+const gotoNextSlideDownCommandName =
   "notebook-subtree-select.gotoNextSlideDown" as const;
 
 const cellTreeBrand = Symbol("IsCellTree");
@@ -363,37 +362,26 @@ function providedOrActiveNotebook(
  *
  * Note that the entire hierarchy can be accessed from this CellTree object via the `parent` attribute.
  *
- * @param cell - Optional: The notebook cell to find the CellTree for.
+ * @param cell - The notebook cell to find the CellTree for.
  * @param notebook - Optional: The notebook editor containing the cell.
  * @returns The CellTree object representing the hierarchy starting at `cell`, or null if not found.
  */
 function cellTree(
-  cell?: vscode.NotebookCell | null,
+  cell: vscode.NotebookCell,
   notebook?: vscode.NotebookEditor
-): CellTreeBranch | null {
+): CellTreeBranch {
   // Get the notebook editor to use
   const notebook2 = providedOrActiveNotebook(notebook);
   if (notebook2 == null) {
-    return null;
+    throw Error("No notebook found");
   }
-
-  // Get the cell to find the CellTree for
-  let cell2: vscode.NotebookCell;
-  if (cell == null) {
-    const selection = notebook2.selection;
-    if (selection == null || selection.isEmpty) {
-      return null;
-    }
-    cell2 = notebook2.notebook.cellAt(selection.start);
-  } else {
-    cell2 = cell;
-  }
-
-  // Parse the CellTree for the notebook
-  const root = parseCellTree(notebook2);
 
   // Find the CellTree for the given cell
-  return findCellTree(cell2, root);
+  const ct = findCellTree(cell, parseCellTree(notebook2));
+  if (!ct) {
+    throw Error("Could not find cell tree");
+  }
+  return ct;
 }
 
 /********************************
@@ -510,18 +498,20 @@ function selectedCells(): vscode.NotebookCell[] {
  *******************************/
 
 function selectSubtree(): void {
-  const tree = cellTree(selectedCell());
-  if (tree === null) {
+  const cell = selectedCell();
+  if (!cell) {
     return;
   }
+  const tree = cellTree(cell);
   selectCellTree(tree);
 }
 
 function selectSiblings(notebook: vscode.NotebookEditor): void {
-  const tree = cellTree(selectedCell());
-  if (tree === null) {
+  const cell = selectedCell();
+  if (!cell) {
     return;
   }
+  const tree = cellTree(cell);
   const p = tree.parent;
   setSelectionInclusiveCellRange(
     p.children[0].cell,
@@ -568,40 +558,47 @@ function getRoot(t: CellTree): CellTreeRoot {
 }
 
 function gotoParentCell(): void {
-  gotoCell(getParent(cellTree(selectedCell())));
+  const cell = selectedCell();
+  if (!cell) {
+    return;
+  }
+  gotoCell(getParent(cellTree(cell)));
 }
 
 function gotoForwardAndUp(): void {
-  const tree = cellTree(selectedCell());
-  if (tree == null) {
+  const cell = selectedCell();
+  if (!cell) {
     return;
   }
+  const tree = cellTree(cell);
   gotoCell(getNthGeneratorItem(forwardAndUpTraversal(tree), 1));
 }
 
 function gotoBackwardAndUp(): void {
-  const tree = cellTree(selectedCell());
-  if (tree === null) {
+  const cell = selectedCell();
+  if (!cell) {
     return;
   }
+  const tree = cellTree(cell);
   gotoCell(getNthGeneratorItem(backwardAndUpTraversal(tree), 1));
 }
 
 function gotoForwardAndOver(): void {
-  const tree = cellTree(selectedCell());
-  if (tree == null) {
-    console.log("null tree");
+  const cell = selectedCell();
+  if (!cell) {
     return;
   }
+  const tree = cellTree(cell);
   const r = getRoot(tree);
   gotoCell(getNthGeneratorItem(forwardAndOverTraversal(tree), 1));
 }
 
 function gotoNextBreadthFirst(): void {
-  const tree = cellTree(selectedCell());
-  if (tree == null) {
+  const cell = selectedCell();
+  if (!cell) {
     return;
   }
+  const tree = cellTree(cell);
   gotoCell(
     getNthGeneratorItem(
       skipUntilItem(breadthFirstTraversal(getRoot(tree)), tree),
@@ -611,19 +608,20 @@ function gotoNextBreadthFirst(): void {
 }
 
 function gotoNextDepthFirst(): void {
-  const tree = cellTree(selectedCell());
-  if (tree == null) {
+  const cell = selectedCell();
+  if (!cell) {
     return;
   }
-  // here I bothered to define the traversal both up and down
+  const tree = cellTree(cell);
   gotoCell(getNthGeneratorItem(depthFirstTraversalDown(tree), 1));
 }
 
 function gotoNextSlideDown(): void {
-  const tree = cellTree(selectedCell());
-  if (tree == null) {
+  const cell = selectedCell();
+  if (!cell) {
     return;
   }
+  const tree = cellTree(cell);
   gotoCell(getNthGeneratorItem(slideDownTraversal(tree), 1));
 }
 
@@ -739,7 +737,7 @@ export function activate(context: vscode.ExtensionContext) {
     [insertHeadingBelowCommandName, insertHeadingBelow],
     [incrementHeadingsCommandName, incrementHeadings],
     [decrementHeadingsCommandName, decrementHeadings],
-    [gotoNextSlideDownCommandName, gotoNextSlideDown]
+    [gotoNextSlideDownCommandName, gotoNextSlideDown],
   ] as const;
 
   // Register each command
