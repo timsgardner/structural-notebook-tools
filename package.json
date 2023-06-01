@@ -34,11 +34,6 @@
         "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
-        "command": "structural-notebook-tools.gotoNextDepthFirst",
-        "key": "i",
-        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
-      },
-      {
         "command": "structural-notebook-tools.gotoNextSlideDown",
         "key": "i",
         "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
