@@ -99,6 +99,28 @@ function* depthFirstTraversal<T>(
   }
 }
 
+function* slideDownTraversal<T>(
+  startNode: T,
+  getParent: NodeAccessor<T>,
+  getChildren: ChildrenAccessor<T>
+): Generator<T, void, unknown> {
+  yield startNode;
+  const children = getChildren(startNode);
+  if (children.length > 0) {
+    yield* slideDownTraversal(children[0], getParent, getChildren);
+  } else {
+    const parent = getParent(startNode);
+    if (parent) {
+      // this bit makes it n^2, but it doesn't matter
+      const siblings = getChildren(parent);
+      const ownInx = siblings.indexOf(startNode);
+      if (siblings.length > ownInx + 1) {
+        yield* slideDownTraversal(siblings[ownInx + 1], getParent, getChildren);
+      }
+    }
+  }
+}
+
 function* breadthFirstTraversal<T>(
   startNode: T,
   getChildren: ChildrenAccessor<T>
@@ -124,6 +146,7 @@ interface TraversalFunctions<T> {
   forwardAndOverTraversal: (startNode: T) => Generator<T, void, unknown>;
   forwardAndUpTraversal: (startNode: T) => Generator<T, void, unknown>;
   depthFirstTraversalDown: (startNode: T) => Generator<T, void, unknown>;
+  slideDownTraversal: (startNode: T) => Generator<T, void, unknown>;
 }
 
 function getTraversalFunctions<T>(
@@ -143,6 +166,8 @@ function getTraversalFunctions<T>(
       forwardAndUpTraversal(startNode, getParent, getChildren),
     depthFirstTraversalDown: (startNode: T) =>
       depthFirstTraversalDown(startNode, getChildren),
+    slideDownTraversal: (startNode: T) =>
+      slideDownTraversal(startNode, getParent, getChildren),
   };
 }
 

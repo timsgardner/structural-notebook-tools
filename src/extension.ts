@@ -36,6 +36,8 @@ const incrementHeadingsCommandName =
   "notebook-subtree-select.incrementHeading" as const;
 const decrementHeadingsCommandName =
   "notebook-subtree-select.decrementHeading" as const;
+  const gotoNextSlideDownCommandName =
+  "notebook-subtree-select.gotoNextSlideDown" as const;
 
 const cellTreeBrand = Symbol("IsCellTree");
 
@@ -76,6 +78,7 @@ const {
   forwardAndOverTraversal,
   forwardAndUpTraversal,
   depthFirstTraversalDown,
+  slideDownTraversal,
 } = getTraversalFunctions(
   (t: CellTree) => (t.root ? null : t.parent),
   (t: CellTree) => t.children
@@ -613,7 +616,15 @@ function gotoNextDepthFirst(): void {
     return;
   }
   // here I bothered to define the traversal both up and down
-  gotoCell(getNthGeneratorItem(depthFirstTraversal(tree), 2));
+  gotoCell(getNthGeneratorItem(depthFirstTraversalDown(tree), 1));
+}
+
+function gotoNextSlideDown(): void {
+  const tree = cellTree(selectedCell());
+  if (tree == null) {
+    return;
+  }
+  gotoCell(getNthGeneratorItem(slideDownTraversal(tree), 1));
 }
 
 /********************************
@@ -727,7 +738,8 @@ export function activate(context: vscode.ExtensionContext) {
     [gotoNextDepthFirstCommandName, gotoNextDepthFirst],
     [insertHeadingBelowCommandName, insertHeadingBelow],
     [incrementHeadingsCommandName, incrementHeadings],
-    [decrementHeadingsCommandName, decrementHeadings]
+    [decrementHeadingsCommandName, decrementHeadings],
+    [gotoNextSlideDownCommandName, gotoNextSlideDown]
   ] as const;
 
   // Register each command
