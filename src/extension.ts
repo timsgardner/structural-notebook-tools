@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // TODO: consider using unified for the traversal and tree stuff
 // TODO: replace marked with remark
+// TODO: cellTree doesn't need to return null
 import * as vscode from "vscode";
 import * as marked from "marked";
 import { getTraversalFunctions } from "./traversals";
@@ -14,6 +15,7 @@ import {
 } from "./utils";
 import { visit } from "unist-util-visit";
 import { remark } from "remark";
+import G = require("glob");
 
 const notebookSubtreeSelectCommandName =
   "notebook-subtree-select.notebookSubtreeSelect" as const;
@@ -30,6 +32,10 @@ const gotoNextDepthFirstCommandName =
   "notebook-subtree-select.gotoNextDepthFirst" as const;
 const insertHeadingBelowCommandName =
   "notebook-subtree-select.insertHeadingBelow" as const;
+const incrementHeadingsCommandName =
+  "notebook-subtree-select.incrementHeading" as const;
+const decrementHeadingsCommandName =
+  "notebook-subtree-select.decrementHeading" as const;
 
 const cellTreeBrand = Symbol("IsCellTree");
 
@@ -83,7 +89,7 @@ function makeMarkedInstance() {
   return marked.marked.setOptions({ mangle: false, headerIds: false });
 }
 
-function adjustHeadingLevels(markdown: string, change: number) {
+function adjustMarkdownStringHeadingLevels(markdown: string, change: number) {
   // Parse the markdown into an AST
   const ast = remark.parse(markdown);
 
@@ -305,14 +311,19 @@ function findCellTree(
   return null;
 }
 
-function depthOfTreeNode(cellTree: CellTree): number {
-  let d = -1;
-  let t: CellTree | null = cellTree;
-  while (t) {
-    d++;
-    t = getParent(t);
+/**
+ * Not the same as the depth in the CellTree!
+ * @param cellTree
+ */
+function markdownDepthOfTreeNode(cellTree: CellTree): number {
+  if (cellTree.root) {
+    return -1;
   }
-  return d;
+  if (cellTree.parent.root) {
+    return 0;
+  }
+  const p = cellTree.parent;
+  return concludingMarkdownLevel(p.cell.document.getText(), 0);
 }
 
 /**
@@ -534,7 +545,6 @@ function gotoCell(
     }
     setSelectionInclusiveCellRange(cell, cell);
   }
-  console.log("gotoCell: cellOrTree null");
 }
 
 function getParent(t: CellTree | null): CellTree | null {
@@ -633,35 +643,66 @@ async function insertMarkdownCell(
   return notebook.notebook.cellAt(position);
 }
 
-/**
- *
- * This one is buggy. Sometimes the headline `#`s don't get inserted, sometimes
- * they do. For whatever reason, once they start working they seem to keep working.
- * No idea.
- * @param position
- */
-async function insertHeadingAtIndex(position: number) {
-  const notebook = enforcePresence(providedOrActiveNotebook());
-  const cell = await insertMarkdownCell(position);
-  const t = cellTree(cell, notebook)!;
-  const depth = depthOfTreeNode(t);
-  console.log(`depth: ${depth}`);
-  notebook.selection = new vscode.NotebookRange(cell.index, cell.index + 1);
-  // await vscode.commands.executeCommand('jupyter.selectCellContents');
-  // await vscode.commands.executeCommand('jupyter.selectCell');
-  await vscode.commands.executeCommand("notebook.cell.edit");
-  const text = "#".repeat(depth - 1) + " ";
-  // console.log('text:', text);
-  await vscode.commands.executeCommand("type", { text });
-  // console.log('typed! hopefully');
-}
-
 async function insertHeadingBelow() {
   const cell = selectedCell();
   if (!cell) {
+    console.log("no cell");
     return;
   }
-  insertHeadingAtIndex(cell.index + 1);
+  const tree = cellTree(cell)!;
+  const depth = markdownDepthOfTreeNode(tree) + 1;
+  const tree2 = cellTree(await insertMarkdownCell(cell.index + 1))!;
+  providedOrActiveNotebook()!.selection = new vscode.NotebookRange(
+    tree2.cell.index,
+    tree2.cell.index + 1
+  );
+  const text = "#".repeat(depth) + " ";
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(
+    tree2.cell.document.uri,
+    new vscode.Range(0, 0, cell.document.lineCount, 0),
+    text
+  );
+  await vscode.workspace.applyEdit(edit);
+}
+
+async function adjustHeadings(amount: number) {
+  const notebook = vscode.window.activeNotebookEditor;
+  if (!notebook) {
+    vscode.window.showInformationMessage("No active notebook editor");
+    return;
+  }
+  const cells = selectedCells().filter(isHeadlineCell);
+
+  if (cells.length === 0) {
+    return;
+  }
+
+  const edit = new vscode.WorkspaceEdit();
+
+  for (const cell of cells) {
+    const oldText = cell.document.getText();
+    const newText = adjustMarkdownStringHeadingLevels(oldText, amount);
+    edit.replace(
+      cell.document.uri,
+      new vscode.Range(0, 0, cell.document.lineCount, 0),
+      newText
+    );
+  }
+
+  await vscode.workspace.applyEdit(edit);
+  const firstCell = cells[0];
+  setSelectionInclusiveCellRange(firstCell, firstCell, notebook, false);
+  await vscode.commands.executeCommand("notebook.cell.edit");
+  await vscode.commands.executeCommand("notebook.cell.quitEdit");
+}
+
+async function incrementHeadings() {
+  await adjustHeadings(1);
+}
+
+async function decrementHeadings() {
+  await adjustHeadings(-1);
 }
 
 /********************************
@@ -685,39 +726,8 @@ export function activate(context: vscode.ExtensionContext) {
     [gotoNextBreadthFirstCommandName, gotoNextBreadthFirst],
     [gotoNextDepthFirstCommandName, gotoNextDepthFirst],
     [insertHeadingBelowCommandName, insertHeadingBelow],
-    [
-      "notebook-subtree-select.incrementHeading",
-      async () => {
-        const notebook = vscode.window.activeNotebookEditor;
-        if (!notebook) {
-          vscode.window.showInformationMessage("No active notebook editor");
-          return;
-        }
-        const cells = selectedCells().filter(isHeadlineCell);
-
-        if (cells.length === 0) {
-          return;
-        }
-
-        const edit = new vscode.WorkspaceEdit();
-
-        for (const cell of cells) {
-          const oldText = cell.document.getText();
-          const newText = adjustHeadingLevels(oldText, 1);
-          edit.replace(
-            cell.document.uri,
-            new vscode.Range(0, 0, cell.document.lineCount, 0),
-            newText
-          );
-        }
-
-        await vscode.workspace.applyEdit(edit);
-        const firstCell = cells[0];
-        setSelectionInclusiveCellRange(firstCell, firstCell, notebook, false);
-        await vscode.commands.executeCommand("notebook.cell.edit");
-        await vscode.commands.executeCommand("notebook.cell.quitEdit");
-      },
-    ],
+    [incrementHeadingsCommandName, incrementHeadings],
+    [decrementHeadingsCommandName, decrementHeadings]
   ] as const;
 
   // Register each command

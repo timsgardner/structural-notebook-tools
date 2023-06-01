@@ -16,49 +16,64 @@
       {
         "command": "notebook-subtree-select.notebookSubtreeSelect",
         "title": "Select cell subtree",
-        "description": "Selects the subtree of cells starting from the current cell"
+        "description": "Selects the subtree of cells starting from the current cell",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
         "command": "notebook-subtree-select.gotoParentCell",
         "title": "Go to next cell parent",
-        "description": "Navigates to the parent cell of the current cell"
+        "description": "Navigates to the parent cell of the current cell",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
         "command": "notebook-subtree-select.gotoForwardAndUp",
         "title": "Go to next cell forward and up",
-        "description": "Moves to the next sibling cell if present, or to parent cell"
+        "description": "Moves to the next sibling cell if present, or to parent cell",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
         "command": "notebook-subtree-select.gotoBackwardAndUp",
         "title": "Go to next cell backward and up",
-        "description": "Moves to the previous sibling cell if present, or to parent cell"
+        "description": "Moves to the previous sibling cell if present, or to parent cell",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
         "command": "notebook-subtree-select.gotoForwardAndOver",
         "title": "Go to next cell forward and over",
-        "description": "Moves to the next sibling cell if present, or to parent cell's next sibling"
+        "description": "Moves to the next sibling cell if present, or to parent cell's next sibling",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
         "command": "notebook-subtree-select.gotoNextBreadthFirst",
         "title": "Go to next breadth-first cell",
-        "description": "Navigates to the next cell using a breadth-first traversal"
+        "description": "Navigates to the next cell using a breadth-first traversal",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
         "command": "notebook-subtree-select.gotoNextDepthFirst",
         "title": "Go to next depth-first cell",
-        "description": "Navigates to the next cell using a depth-first traversal"
+        "description": "Navigates to the next cell using a depth-first traversal",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
         "command": "notebook-subtree-select.insertHeadingBelow",
         "title": "Insert notebook heading below",
-        "description": "Inserts a heading cell below the current cell in the notebook"
+        "description": "Inserts a heading cell below the current cell in the notebook",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook'"
       },
       {
-        "command": "notebook-subtree-select.incrementHeading",
-        "title": "Increment heading",
-        "description": "afadfas"
+        "command": "notebook-subtree-select.incrementHeadings",
+        "title": "Increment headings",
+        "description": "Increment the heading level of all selected markdown",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook' && !editorReadOnly"
+      },
+      {
+        "command": "notebook-subtree-select.decrementHeadings",
+        "title": "Decrement headings",
+        "description": "Decrement the heading level of all selected markdown",
+        "when": "notebookEditorFocused && !inputFocus && activeEditor == 'workbench.editor.notebook' && !editorReadOnly"
       }
-    ]
+    ]    
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
