@@ -85,7 +85,7 @@ All keybindings below apply only to notebooks in **command mode**.
 
 ## Contributing
 
-ChatGPT feels that contributions are what make the open-source community an incredible place to learn, inspire, and create. Who am I to argue? Any contributions to **Structural Notebook Tools** are **greatly appreciated**. Check out the [Contributing Guidelines](CONTRIBUTING.md) for ways to get started.
+ChatGPT feels that contributions are what make the open-source community an incredible place to learn, inspire, and create. Who am I to argue? Any contributions to **Structural Notebook Tools** are **greatly appreciated** (but might get rejected). Anyway, if you have a good idea lmk.
 
 ## License
 
