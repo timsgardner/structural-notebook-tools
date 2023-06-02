@@ -1,6 +1,6 @@
 # Structural Notebook Tools
 
-**Structural Notebook Tools** is a Visual Studio Code extension specifically designed to enhance your experience with notebooks by enabling rapid traversal of the implicit markdown tree. In addition, it enables various selection and tree-related editing operations, facilitating a more structured and organized workflow for notebook users.
+**Structural Notebook Tools** is a Visual Studio Code extension for _directly_ traversing and editing VSC notebooks in terms of the _tree of cells_ implied by markdown headings.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@
 
 This extension allows more structured editing of notebooks than is provided by Visual Studio Code's defaults. In particular, it provides commands and keybindings to navigate and edit the notebook in terms of the cell hierarchy implied by markdown headings.
 
-These commands run directly in the notebook's command mode (not in a new inspector).
+These commands run directly in the notebook's command mode.
 
 - Quickly navigate the tree
 - Select subtrees
@@ -67,7 +67,7 @@ For more information about packaging and publishing extensions, you can refer to
 
 ## Usage
 
-All keybindings below apply only to notebooks in command mode.
+All keybindings below apply only to notebooks in **command mode**.
 
 | Title                                       | Command                                           | Description                                                                                                                                                                                                                                                                                                           | Default Keybinding |
 | ------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
