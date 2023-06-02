@@ -11,7 +11,8 @@
 - [Usage](#usage)
 - [Contributing](#contributing)
 - [License](#license)
-- 
+
+
 ## Features
 
 This extension allows more structured editing of notebooks than is provided by Visual Studio Code's defaults. In particular, it provides commands and keybindings to navigate and edit the notebook in terms of the cell hierarchy implied by markdown headings.
