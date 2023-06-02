@@ -87,20 +87,6 @@ All keybindings below apply only to notebooks in **command mode**.
 
 ChatGPT feels that contributions are what make the open-source community an incredible place to learn, inspire, and create. Who am I to argue? Any contributions to **Structural Notebook Tools** are **greatly appreciated**. Check out the [Contributing Guidelines](CONTRIBUTING.md) for ways to get started.
 
-In particular, better
-
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
-## Contact
-
-_Your Name_ - [Your Email](mailto:youremail@example.com)
-
-Project Link: [https://github.com/yourusername/Structural-Notebook-Tools](https://github.com/yourusername/Structural-Notebook-Tools)
-
-## Acknowledgments
-
-_[Include acknowledgments here]_
-
----
