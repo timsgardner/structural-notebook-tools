@@ -111,7 +111,7 @@ Depth-first traversal is the same as just going to the next cell (ie, pushing th
 
 ## Contributing
 
-ChatGPT feels that contributions are what make the open-source community an incredible place to learn, inspire, and create. Who am I to argue? Any contributions to **Structural Notebook Tools** are **greatly appreciated** (but might get rejected). Anyway, if you have a good idea lmk.
+Any contributions to **Structural Notebook Tools** are **greatly appreciated** (but might get rejected). If you have an idea LMK.
 
 ## License
 
