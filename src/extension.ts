@@ -14,7 +14,6 @@ import {
 } from "./utils";
 import { visit } from "unist-util-visit";
 import { remark } from "remark";
-import G = require("glob");
 
 const notebookSubtreeSelectCommandName =
   "structural-notebook-tools.notebookSubtreeSelect" as const;
