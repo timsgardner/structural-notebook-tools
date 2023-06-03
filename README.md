@@ -12,7 +12,6 @@
 - [Contributing](#contributing)
 - [License](#license)
 
-
 ## Features
 
 This extension allows more structured editing of notebooks than is provided by Visual Studio Code's defaults. In particular, it provides commands and keybindings to navigate and edit the notebook in terms of the cell hierarchy implied by markdown headings.
@@ -68,19 +67,47 @@ For more information about packaging and publishing extensions, you can refer to
 
 All keybindings below apply only to notebooks in **command mode**.
 
-| Title                                       | Command                                           | Description                                                                                                                                                                                                                                                                                                           | Default Keybinding |
-| ------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| SNT: Decrement headings                     | `structural-notebook-tools.decrementHeadings`     | Decrement the heading level of all selected markdown                                                                                                                                                                                                                                                                  |                    |
-| SNT: Go to next breadth-first cell          | `structural-notebook-tools.gotoNextBreadthFirst`  | Navigates to the next cell using a breadth-first traversal                                                                                                                                                                                                                                                            |                    |
-| SNT: Go to next cell backward and up        | `structural-notebook-tools.gotoBackwardAndUp`     | Moves to the previous sibling cell if present, or to parent cell. Inverse of `structural-notebook-tools.gotoNextSlideDown`.                                                                                                                                                                                           | `p`                |
-| SNT: Go to next cell forward and over       | `structural-notebook-tools.gotoForwardAndOver`    | Moves to the next sibling cell if present, or to parent cell's next sibling                                                                                                                                                                                                                                           | `n`                |
-| SNT: Go to next cell forward and up         | `structural-notebook-tools.gotoForwardAndUp`      | Moves to the next sibling cell if present, or to parent cell                                                                                                                                                                                                                                                          |                    |
-| SNT: Go to next cell parent                 | `structural-notebook-tools.gotoParentCell`        | Navigates to the parent cell of the current cell                                                                                                                                                                                                                                                                      | `u`                |
-| SNT: Go to next cell, sliding over and down | `structural-notebook-tools.gotoNextSlideDown`     | If the selected cell has children, move to the first child; otherwise, move to the next sibling if there is one. If there is not one, stay put. Gives the markdown tree a more structured feel by preventing the cursor from jumping up levels. The inverse command is `structural-notebook-tools.gotoBackwardAndUp`. | `i`                |
-| SNT: Go to next depth-first cell            | `structural-notebook-tools.gotoNextDepthFirst`    | Navigates to the next cell using a depth-first traversal                                                                                                                                                                                                                                                              |                    |
-| SNT: Increment headings                     | `structural-notebook-tools.incrementHeadings`     | Increment the heading level of all selected markdown                                                                                                                                                                                                                                                                  |                    |
-| SNT: Insert notebook heading below          | `structural-notebook-tools.insertHeadingBelow`    | Inserts a heading cell below the current cell in the notebook, at the same markdown level as the current cell (that is, lateral to it).                                                                                                                                                                               |                    |
-| SNT: Select cell subtree                    | `structural-notebook-tools.notebookSubtreeSelect` | Selects the subtree of cells starting from the current cell                                                                                                                                                                                                                                                           | `h`                |
+In the visualizations below, "top" is not a cell, but represents the root of the document (and therefore cannot be selected or have a cursor at it). I put it in the tree visualizations because otherwise I'd have to use a forest, which is more confusing. The other nodes represent the implicit level of the markdown tree, and the notebook would look like this:
+
+```
+# <some h1 heading>
+
+## <some h2 heading>
+
+<cell>
+
+<cell>
+
+## <some h2 heading>
+
+<cell>
+
+<cell>
+
+# <some h1 heading>
+
+<cell>
+
+<cell>
+
+```
+
+Depth-first traversal is the same as just going to the next cell (ie, pushing the down key when in command mode), so it doesn't have a command. It looks like this:
+
+<img src="doc_images/normal%20traversal.svg" width="600">
+
+| Title                                       | Command                                           | Description                                                                                                                                                                                                                                                                                             | Default Keybinding | Traversal                                                        |
+| ------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------- |
+| SNT: Decrement headings                     | `structural-notebook-tools.decrementHeadings`     | Decrement the heading level of all selected markdown                                                                                                                                                                                                                                                    |                    | ![bla](doc_images/normal%20traversal.svg)                        |
+| SNT: Go to next breadth-first cell          | `structural-notebook-tools.gotoNextBreadthFirst`  | Navigates to the next cell using a breadth-first traversal                                                                                                                                                                                                                                              |                    | ![bla](doc_images/breadth%20first%20traversal.svg)               |
+| SNT: Go to next cell backward and up        | `structural-notebook-tools.gotoBackwardAndUp`     | Moves to the previous sibling cell if present, or to parent cell. Inverse of `structural-notebook-tools.gotoNextSlideDown`.                                                                                                                                                                             | `p`                | ![bla](doc_images/previous%20sibling%20and%20up%20traversal.svg) |
+| SNT: Go to next cell forward and over       | `structural-notebook-tools.gotoForwardAndOver`    | Moves to the next sibling cell if present, or to parent cell's next sibling                                                                                                                                                                                                                             | `n`                | ![bla](doc_images/next%20sibling%20and%20over%20traversal.svg)   |
+| SNT: Go to next cell forward and up         | `structural-notebook-tools.gotoForwardAndUp`      | Moves to the next sibling cell if present, or to parent cell                                                                                                                                                                                                                                            |                    | ![bla](doc_images/next%20sibling%20and%20up%20traversal.svg)     |
+| SNT: Go to next cell parent                 | `structural-notebook-tools.gotoParentCell`        | Navigates to the parent cell of the current cell                                                                                                                                                                                                                                                        | `u`                | ![bla](doc_images/go%20to%20parent%20traversal.svg)              |
+| SNT: Go to next cell, sliding over and down | `structural-notebook-tools.gotoNextSlideDown`     | If the selected cell has children, move to the first child; otherwise, move to the next sibling if there is one. If there is not one, stay put. Gives the markdown tree a more structured feel by preventing the cursor from jumping up levels. Reverses `structural-notebook-tools.gotoBackwardAndUp`. | `i`                | ![bla](doc_images/slide%20over%20and%20down%20traversal.svg)     |
+| SNT: Increment headings                     | `structural-notebook-tools.incrementHeadings`     | Increment the heading level of all selected markdown                                                                                                                                                                                                                                                    |                    |                                                                  |
+| SNT: Insert notebook heading below          | `structural-notebook-tools.insertHeadingBelow`    | Inserts a heading cell below the current cell in the notebook, at the same markdown level as the current cell (that is, lateral to it in the tree).                                                                                                                                                     |                    |                                                                  |
+| SNT: Select cell subtree                    | `structural-notebook-tools.notebookSubtreeSelect` | Selects the subtree of cells starting from the current cell                                                                                                                                                                                                                                             | `h`                |                                                                  |
 
 ## Contributing
 
