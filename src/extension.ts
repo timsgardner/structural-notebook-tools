@@ -32,9 +32,9 @@ const gotoNextDepthFirstCommandName =
 const insertHeadingBelowCommandName =
   "structural-notebook-tools.insertHeadingBelow" as const;
 const incrementHeadingsCommandName =
-  "structural-notebook-tools.incrementHeading" as const;
+  "structural-notebook-tools.incrementHeadings" as const;
 const decrementHeadingsCommandName =
-  "structural-notebook-tools.decrementHeading" as const;
+  "structural-notebook-tools.decrementHeadings" as const;
 const gotoNextSlideDownCommandName =
   "structural-notebook-tools.gotoNextSlideDown" as const;
 
