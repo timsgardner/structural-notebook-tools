@@ -92,7 +92,7 @@
       },
       {
         "command": "structural-notebook-tools.gotoNextSlideDown",
-        "title": "SNT: Go to next cell, sliding over and down"
+        "title": "SNT: Go to next cell, sliding down and over"
       }
     ]    
   },
