@@ -5,12 +5,17 @@
 ## Table of Contents
 
 - [Features](#features)
+- [Rationale](#rationale)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [Usage](#usage)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Rationale
+
+Notebooks can quickly become unwieldy, as there is a mismatch between their aspects as _linear text_ and as a _hierarchy of cells_. Fortunately, we can mitigate this with structural tools, similar to Emacs's famous [org mode](https://orgmode.org/).
 
 ## Features
 
@@ -98,7 +103,7 @@ Depth-first traversal is the same as just going to the next cell (ie, pushing th
 
 | Title                                       | Command                                           | Description                                                                                                                                                                                                                                                                                             | Default Keybinding | Traversal                                                        |
 | ------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------- |
-| SNT: Decrement headings                     | `structural-notebook-tools.decrementHeadings`     | Decrement the heading level of all selected markdown                                                                                                                                                                                                                                                    |                    | ![bla](doc_images/normal%20traversal.svg)                        |
+| SNT: Decrement headings                     | `structural-notebook-tools.decrementHeadings`     | Decrements the heading level of all selected markdown                                                                                                                                                                                                                                                   |                    | ![bla](doc_images/normal%20traversal.svg)                        |
 | SNT: Go to next breadth-first cell          | `structural-notebook-tools.gotoNextBreadthFirst`  | Navigates to the next cell using a breadth-first traversal                                                                                                                                                                                                                                              |                    | ![bla](doc_images/breadth%20first%20traversal.svg)               |
 | SNT: Go to next cell backward and up        | `structural-notebook-tools.gotoBackwardAndUp`     | Moves to the previous sibling cell if present, or to parent cell. Inverse of `structural-notebook-tools.gotoNextSlideDown`.                                                                                                                                                                             | `p`                | ![bla](doc_images/previous%20sibling%20and%20up%20traversal.svg) |
 | SNT: Go to next cell forward and over       | `structural-notebook-tools.gotoForwardAndOver`    | Moves to the next sibling cell if present, or to parent cell's next sibling                                                                                                                                                                                                                             | `n`                | ![bla](doc_images/next%20sibling%20and%20over%20traversal.svg)   |
